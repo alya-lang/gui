@@ -11,14 +11,13 @@ Native cross-platform GUI toolkit: windowing, widgets, layout, and 2D canvas for
 
 ## 🌟 Features
 
-- ⚡ **Lightweight & High Performance**: Minimal memory overhead, zero runtime bloat, and fast native execution
-- 🧩 **Modular Architecture**: Layered multi-module design featuring a clean public facade (`src/lib.alya`), rich data models (`src/types.alya`), and encapsulated core formatters (`src/core/formatter.alya`)
+- ⚡ **Headless-Testable Foundation**: Geometry, backend detection, and event queue run without a display — full CI coverage on every runner
+- 🧩 **Modular Architecture**: Clean public facade (`src/lib.alya`), domain models (`src/types.alya`), and focused core modules (`src/core/geometry.alya`, `src/core/backend.alya`, `src/core/events.alya`)
+- 🖥️ **Native Backend Selection**: Host-aware HAL routing — Win32, Cocoa, Wayland/X11, or `unknown` on headless machines
 - 🔒 **Public/Private Visibility (`pub`)**: Fine-grained export control with `pub` for public functions, structs, and enums, keeping internal helper functions private and encapsulated
-- 🎭 **Structural Duck Typing & Interfaces**: Dynamic interface dispatch (`Summarizable`, `Describable`) without brittle inheritance hierarchies
-- 📦 **Rich Domain Models & Enums**: Idiomatic `enum` types (`GuiStatus`, `GuiPriority`, `GuiStyle`) and typed data containers (`GuiConfig`, `GuiResult`, `GuiStats`)
-- 🎯 **Advanced Pattern Matching**: Clean branching with `when` expressions, range matching, and condition guards
-- 🛡️ **Defensive Result Pattern**: Structured error handling and outcome encapsulation with `ok_result` and `error_result`
-- 🧪 **Enterprise Test & Benchmark Suite**: 100% test coverage with standard assertions (`std/test`) and micro-benchmarking (`std/test` bench runner)
+- 📐 **Integer Geometry Primitives**: Rect overlap/union/inset math for layout, hit-testing, and damage regions
+- 📬 **Portable Event Queue**: FIFO `GuiEvent` pump (mouse, keyboard, resize, close) ready for native OS loop integration
+- 🧪 **Enterprise Test & Benchmark Suite**: Headless test coverage with standard assertions (`std/test`) and micro-benchmarking (`std/test` bench runner)
 
 ---
 
@@ -37,7 +36,9 @@ gui/
 │   ├── types.alya          # Data models, pub enums, pub structs, and struct methods
 │   ├── ffi.alya            # (Optional) Native extern "C" declarations
 │   └── core/               # Subdirectory module hierarchy
-│       └── formatter.alya  # Domain formatting routines, salutation builders & pattern matchers
+│       ├── geometry.alya   # Headless rect math (overlap, union, inset)
+│       ├── backend.alya    # Host backend detection (windows/macos/wayland/x11)
+│       └── events.alya     # Portable FIFO GUI event queue
 ├── examples/
 │   └── demo.alya           # Comprehensive runnable walkthrough of all package capabilities
 ├── tests/
@@ -75,18 +76,20 @@ alya install
 import "gui" as pkg
 
 function main()
-    # 1. Basic facade call with default parameter
-    let greeting = pkg::hello()
-    say f"Greeting:  {greeting}"
+    # 1. Backend detection (headless-safe)
+    let info = pkg::backend_details()
+    say f"Backend: {info.backend} ({info.os})"
 
-    # 2. Struct configuration with priority, style, and methods
-    let cfg = pkg::new_config("Community", 5, pkg::GuiPriority.High, pkg::GuiStyle.Formal)
-    say f"Summary:   {cfg.summary()}"
-    say f"Formatted: {pkg::core_format_custom(cfg)}"
+    # 2. Geometry: overlap of two windows
+    let a = pkg::rect(10, 10, 100, 50)
+    let b = pkg::rect(50, 30, 100, 100)
+    say f"Overlap area: {pkg::overlap_area(a, b)}"
 
-    # 3. Processing pipeline returning Result model
-    let res = pkg::process("Analytics", 3, pkg::GuiPriority.Critical)
-    say f"Outcome:   {res.message}"
+    # 3. Event queue: feed mouse + close, drain in order
+    let q = pkg::event_queue()
+    pkg::event_queue_push(q, pkg::event_new(pkg::GuiEventKind.MouseDown, 5, 6))
+    let ev = pkg::event_queue_poll(q)
+    say f"Polled kind: {ev.kind}"
 end
 
 main()
@@ -98,44 +101,33 @@ main()
 
 | Symbol | Visibility | Description |
 |---|---|---|
-| `hello(name = "World")` | `pub function` | Returns a formatted greeting string. Defaults to `"World"` if null or empty. |
-| `new_config(name, count, priority, style)` | `pub function` | Factory constructing a `GuiConfig` with sensible defaults. |
-| `make_config(name, count, priority, style, enabled, tags)` | `pub function` | Full constructor for `GuiConfig`. |
-| `process(label, count, priority)` | `pub function` | Runs processing pipeline, returning an `ok_result` `GuiResult`. |
-| `process_batch(labels)` | `pub function` | Formats an array of labels in batch, returning an array of strings. |
-| `ok_result(value, message)` | `pub function` | Constructs a successful `GuiResult` container (`status = 0`). |
-| `error_result(message, errors)` | `pub function` | Constructs a failed `GuiResult` container (`status = 1`). |
-| `make_stats(total, passed, failed, skipped)` | `pub function` | Constructs a `GuiStats` metrics record. |
-| `format_summary(cfg)` | `pub function` | Formats summary of a config instance (satisfies `Summarizable`). |
-| `format_description(cfg)` | `pub function` | Formats description of a config instance (satisfies `Describable`). |
-| `format_config(config)` | `pub function` | Multi-field formatter producing descriptive overview of a `GuiConfig`. |
-| `format_result(result)` | `pub function` | Formats a `GuiResult` into `[OK]` or `[ERROR]` status line. |
-| `format_stats(stats)` | `pub function` | Formats total checked items and success rate percentage. |
-| `clamp(n, min_val, max_val)` | `pub function` | Clamps an integer value to the closed range `[min_val, max_val]`. |
-| `pluralize(n, singular, plural)` | `pub function` | Pattern-matches count to return singular or plural noun form. |
-| `repeat_string(label, count)` | `pub function` | Repeats a string into an array of `count` items. |
-| `Summarizable` | `pub interface` | Structural contract requiring `summary(self) -> string`. |
-| `Describable` | `pub interface` | Structural contract requiring `describe(self) -> string` and `is_valid(self) -> int`. |
-| `GuiStatus` | `pub enum` | Lifecycle status codes (`Pending = 0`, `Active = 1`, `Archived = 2`, `Error = 3`). |
-| `GuiPriority` | `pub enum` | Priority tiers (`Low = 0`, `Normal = 1`, `High = 2`, `Critical = 3`). |
-| `GuiStyle` | `pub enum` | Presentation styles (`Standard = 0`, `Formal = 1`, `Casual = 2`). |
-| `GuiConfig` | `pub struct` | Primary configuration model (`name`, `count`, `priority`, `style`, `enabled`, `tags`). |
-| `GuiConfig.summary()` | `pub method` | Single-line formatted summary (satisfies `Summarizable`). |
-| `GuiConfig.describe()` | `pub method` | Detailed multi-field description (satisfies `Describable`). |
-| `GuiConfig.is_valid()` | `pub method` | Validation guard returning 1 if valid, 0 otherwise. |
-| `GuiConfig.is_enabled()` | `pub method` | Returns 1 if active, 0 if disabled. |
-| `GuiConfig.with_name(new_name)` | `pub method` | Immutable copy with updated name. |
-| `GuiConfig.with_priority(new_prio)` | `pub method` | Immutable copy with updated priority tier. |
-| `GuiResult` | `pub struct` | Operation outcome model (`value`, `status`, `message`, `errors`). |
-| `GuiResult.is_ok()` | `pub method` | Returns 1 if successful (`status == 0`), 0 otherwise. |
-| `GuiResult.is_error()` | `pub method` | Returns 1 if error (`status != 0`), 0 otherwise. |
-| `GuiResult.unwrap_or(fallback)` | `pub method` | Returns message on success, or fallback on error. |
-| `GuiStats` | `pub struct` | Run statistics model (`total`, `passed`, `failed`, `skipped`). |
-| `GuiStats.total_checked()` | `pub method` | Sum of passed and failed items count. |
-| `GuiStats.success_rate()` | `pub method` | Computed percentage string (e.g. `"95%"`). |
+| `window(title, width, height)` | `pub function` | Validated `WindowConfig` factory (falls back to `640x480` / `"Alya"`). |
+| `backend()` | `pub function` | Backend name for the host (`"windows"`, `"macos"`, `"wayland"`, `"x11"`, `"unknown"`). |
+| `backend_details()` | `pub function` | `BackendInfo` record (backend, os, display endpoint). |
+| `event_queue()` | `pub function` | Empty FIFO `GuiEventQueue`. |
+| `event_new(kind, x, y, key, text)` | `pub function` | `GuiEvent` record constructor. |
+| `event_queue_push(q, ev)` | `pub function` | Appends an event; returns pending count. |
+| `event_queue_poll(q)` | `pub function` | Removes and returns the next event (null when empty). |
+| `event_queue_peek(q)` | `pub function` | Returns the next event without consuming it. |
+| `event_queue_len(q)` | `pub function` | Pending event count. |
+| `event_queue_clear(q)` | `pub function` | Drops all pending events. |
+| `rect(x, y, w, h)` | `pub function` | `Rect` constructor. |
+| `rect_intersect(a, b)` | `pub function` | Overlap region (empty rect when disjoint). |
+| `rect_union(a, b)` | `pub function` | Smallest enclosing rect. |
+| `rect_inset(r, dx, dy)` | `pub function` | Shrinks the rect on every side. |
+| `overlap_area(a, b)` | `pub function` | Overlap area of two rects (`0` when disjoint). |
+| `rgb(r, g, b)` / `rgba(r, g, b, a)` | `pub function` | Opaque / transparent `Color` constructors. |
+| `c_add(a, b)` | `pub function` | Bundled C engine smoke test via FFI. |
+| `GuiBackend` | `pub enum` | Backend codes (`Unknown = 0`, `Windows = 1`, `MacOs = 2`, `Wayland = 3`, `X11 = 4`). |
+| `GuiEventKind` | `pub enum` | Event kinds (`Close = 1`, `MouseDown = 4`, `KeyDown = 6`, `TextInput = 8`, ...). |
+| `Point` / `Size` / `Rect` / `Color` | `pub struct` | Geometry primitives with methods (`area()`, `is_empty()`, `contains()`, `to_string()`). |
+| `WindowConfig` | `pub struct` | Window creation parameters (`title`, `width`, `height`). |
+| `BackendInfo` | `pub struct` | Detection result (`backend`, `os`, `display`). |
+| `GuiEvent` | `pub struct` | Event record (`kind`, `x`, `y`, `key`, `text`). |
+| `GuiEventQueue` | `pub struct` | FIFO queue with polling cursor (`events`, `head`). |
 
 > [!TIP]
-> **Internal Helpers & Documentation:** Public symbols are documented with `##` Markdown docstrings, enabling automatic API documentation generation via `alya doc`. Private functions such as `build_salutation` and `build_priority_label` in `src/core/formatter.alya` are not annotated with `pub` and remain encapsulated within their respective modules.
+> **Internal Helpers & Documentation:** Public symbols are documented with `##` Markdown docstrings, enabling automatic API documentation generation via `alya doc`.
 
 ---
 

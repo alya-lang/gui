@@ -1,0 +1,59 @@
+## Geometry tests for gui
+## Part of the Alya Language package ecosystem (https://github.com/alya-lang)
+
+import "std/test"
+import "../src/lib.alya" as pkg
+
+function main()
+    test_suite("gui Geometry Tests")
+    let r = runner_new()
+
+    let a = pkg::rect(10, 10, 100, 50)
+    runner_assert_eq(r, a.area(), 5000, "area 100x50")
+    runner_assert_eq(r, a.is_empty(), 0, "non-empty rect")
+
+    let empty = pkg::rect(0, 0, 0, 0)
+    runner_assert_eq(r, empty.area(), 0, "empty area 0")
+    runner_assert_eq(r, empty.is_empty(), 1, "empty rect")
+
+    runner_assert_eq(r, a.contains(10, 10), 1, "top-left edge inclusive")
+    runner_assert_eq(r, a.contains(110, 60), 1, "bottom-right edge inclusive")
+    runner_assert_eq(r, a.contains(111, 60), 0, "outside right")
+    runner_assert_eq(r, a.contains(10, 9), 0, "outside top")
+    runner_assert_eq(r, empty.contains(0, 0), 0, "empty contains nothing")
+
+    let b = pkg::rect(50, 30, 100, 100)
+    runner_assert_eq(r, pkg::rect_intersects(a, b), 1, "overlap detected")
+    let ov = pkg::rect_intersect(a, b)
+    runner_assert_eq(r, ov.x, 50, "overlap x")
+    runner_assert_eq(r, ov.y, 30, "overlap y")
+    runner_assert_eq(r, ov.w, 60, "overlap w")
+    runner_assert_eq(r, ov.h, 30, "overlap h")
+
+    let c = pkg::rect(200, 200, 10, 10)
+    runner_assert_eq(r, pkg::rect_intersects(a, c), 0, "disjoint detected")
+    let no = pkg::rect_intersect(a, c)
+    runner_assert_eq(r, no.is_empty(), 1, "disjoint overlap is empty")
+
+    let u = pkg::rect_union(a, c)
+    runner_assert_eq(r, u.x, 10, "union x")
+    runner_assert_eq(r, u.y, 10, "union y")
+    runner_assert_eq(r, u.w, 200, "union w")
+    runner_assert_eq(r, u.h, 200, "union h")
+
+    let ins = pkg::rect_inset(a, 5, 5)
+    runner_assert_eq(r, ins.x, 15, "inset x")
+    runner_assert_eq(r, ins.w, 90, "inset w")
+    runner_assert_eq(r, ins.h, 40, "inset h")
+    let flat = pkg::rect_inset(a, 100, 100)
+    runner_assert_eq(r, flat.is_empty(), 1, "over-inset is empty")
+
+    runner_assert_eq(r, pkg::overlap_area(a, b), 1800, "overlap area 60x30")
+
+    let failed = runner_summary(r)
+    if failed > 0
+        exit(1)
+    end
+end
+
+main()

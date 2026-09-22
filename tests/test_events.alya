@@ -1,0 +1,57 @@
+## Event queue tests for gui
+## Part of the Alya Language package ecosystem (https://github.com/alya-lang)
+
+import "std/test"
+import "../src/lib.alya" as pkg
+
+function main()
+    test_suite("gui Event Queue Tests")
+    let r = runner_new()
+
+    let q = pkg::event_queue()
+    runner_assert_eq(r, pkg::event_queue_len(q), 0, "new queue empty")
+    runner_assert_eq(r, pkg::event_queue_is_empty(q), 1, "is_empty on new queue")
+    runner_assert(r, pkg::event_queue_poll(q) is null, "poll empty is null")
+    runner_assert(r, pkg::event_queue_peek(q) is null, "peek empty is null")
+
+    runner_assert_eq(r, pkg::event_queue_push(q, pkg::event_new(pkg::GuiEventKind.MouseDown, 5, 6)), 1, "push returns len 1")
+    runner_assert_eq(r, pkg::event_queue_push(q, pkg::event_new(pkg::GuiEventKind.KeyDown, 0, 0, 65)), 2, "push returns len 2")
+    runner_assert_eq(r, pkg::event_queue_is_empty(q), 0, "non-empty queue")
+
+    let peeked = pkg::event_queue_peek(q)
+    runner_assert_eq(r, peeked.kind, pkg::GuiEventKind.MouseDown, "peek sees first")
+    runner_assert_eq(r, pkg::event_queue_len(q), 2, "peek does not consume")
+
+    let first = pkg::event_queue_poll(q)
+    runner_assert_eq(r, first.kind, pkg::GuiEventKind.MouseDown, "FIFO first")
+    runner_assert_eq(r, first.x, 5, "first payload x")
+    let second = pkg::event_queue_poll(q)
+    runner_assert_eq(r, second.kind, pkg::GuiEventKind.KeyDown, "FIFO second")
+    runner_assert_eq(r, second.key, 65, "second payload key")
+    runner_assert_eq(r, pkg::event_queue_len(q), 0, "drained queue")
+
+    # Stress the head cursor past the compaction threshold.
+    let i = 0
+    while i < 200
+        pkg::event_queue_push(q, pkg::event_new(pkg::GuiEventKind.Redraw))
+        i += 1
+    end
+    runner_assert_eq(r, pkg::event_queue_len(q), 200, "200 queued")
+    let n = 0
+    while n < 200
+        pkg::event_queue_poll(q)
+        n += 1
+    end
+    runner_assert_eq(r, pkg::event_queue_len(q), 0, "200 drained after compaction")
+
+    pkg::event_queue_push(q, pkg::event_new(pkg::GuiEventKind.Close))
+    runner_assert_eq(r, pkg::event_queue_clear(q), 1, "clear returns 1")
+    runner_assert_eq(r, pkg::event_queue_len(q), 0, "cleared queue")
+
+    let failed = runner_summary(r)
+    if failed > 0
+        exit(1)
+    end
+end
+
+main()

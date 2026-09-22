@@ -1,0 +1,66 @@
+## gui/core/backend — host backend detection (HAL selection)
+##
+## Part of the Alya Language package ecosystem (https://github.com/alya-lang).
+## Picks the native backend name for the host OS without opening any window:
+## `"windows"` (Win32), `"macos"` (Cocoa), `"wayland"` / `"x11"` (Linux),
+## or `"unknown"` (headless / unsupported). Covered by `alya test` on all CI
+## runners, including headless Linux (expects `"wayland"`, `"x11"`, or
+## `"unknown"` depending on the runner's display sockets).
+
+import "std/os" as os
+import "../types.alya"
+
+## Selects the backend name for the current host.
+##
+## Linux probing order follows the roadmap: `WAYLAND_DISPLAY` first
+## (native Wayland), then `DISPLAY` (X11 fallback).
+pub function backend_select() -> string
+    if os::is_windows() == 1
+        return "windows"
+    end
+    if os::is_macos() == 1
+        return "macos"
+    end
+    if os::is_linux() == 1
+        if os::env("WAYLAND_DISPLAY") != ""
+            return "wayland"
+        end
+        if os::env("DISPLAY") != ""
+            return "x11"
+        end
+        return "unknown"
+    end
+    return "unknown"
+end
+
+## Returns the display endpoint probed for Linux backends.
+##
+## `WAYLAND_DISPLAY` wins over `DISPLAY`; `""` when neither is set.
+pub function backend_display() -> string
+    let wl = os::env("WAYLAND_DISPLAY")
+    if wl != ""
+        return wl
+    end
+    return os::env("DISPLAY")
+end
+
+## Returns 1 when no usable display is reachable on Linux.
+##
+## Windows and macOS always report `0` (their window managers are implicit).
+pub function is_headless() -> int
+    if os::is_linux() == 1
+        if backend_display() == ""
+            return 1
+        end
+    end
+    return 0
+end
+
+## Collects backend name, OS name, and display endpoint in one record.
+pub function backend_info() -> BackendInfo
+    return BackendInfo {
+        backend: backend_select(),
+        os: os::os_name(),
+        display: backend_display()
+    }
+end

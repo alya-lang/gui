@@ -7,71 +7,45 @@ import "../src/lib.alya" as pkg
 function main()
     let runner = bench_runner("gui Micro-Benchmarks")
 
-    # Bench 1: hello() facade function — 100k iterations
-    bench_start(runner, 100000)
+    # Bench 1: rect intersect — 200k iterations
+    let ba = pkg::rect(10, 10, 100, 50)
+    let bb = pkg::rect(50, 30, 100, 100)
+    bench_start(runner, 200000)
     let i = 0
-    while i < 100000
-        pkg::hello("Alya")
+    while i < 200000
+        pkg::rect_intersect(ba, bb)
         i += 1
     end
-    bench_stop(runner, "hello() 100k calls")
+    bench_stop(runner, "rect_intersect 200k calls")
 
-    # Bench 2: process() default call — 100k iterations
+    # Bench 2: event queue push+poll — 100k iterations
     bench_start(runner, 100000)
+    let q = pkg::event_queue()
     let j = 0
     while j < 100000
-        pkg::process()
+        pkg::event_queue_push(q, pkg::event_new(pkg::GuiEventKind.Redraw))
+        pkg::event_queue_poll(q)
         j += 1
     end
-    bench_stop(runner, "process() default 100k calls")
+    bench_stop(runner, "queue push+poll 100k pairs")
 
-    # Bench 3: make_config + format_config — 50k iterations
+    # Bench 3: backend_select — 50k iterations
     bench_start(runner, 50000)
     let k = 0
     while k < 50000
-        let cfg = pkg::new_config("bench", 1, pkg::GuiPriority.High, pkg::GuiStyle.Formal)
-        pkg::core_format_custom(cfg)
+        pkg::backend()
         k += 1
     end
-    bench_stop(runner, "new_config + format_custom 50k calls")
+    bench_stop(runner, "backend_select 50k calls")
 
-    # Bench 4: process_batch with 10-element array — 10k iterations
-    let labels = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j"]
-    bench_start(runner, 10000)
+    # Bench 4: window config construction — 100k iterations
+    bench_start(runner, 100000)
     let m = 0
-    while m < 10000
-        pkg::process_batch(labels)
+    while m < 100000
+        pkg::window("Bench", 800, 600)
         m += 1
     end
-    bench_stop(runner, "process_batch 10-item list 10k calls")
-
-    # Bench 5: struct method cfg.summary() — 200k iterations
-    let summ_cfg = pkg::new_config("summary-bench", 5)
-    bench_start(runner, 200000)
-    let s = 0
-    while s < 200000
-        summ_cfg.summary()
-        s += 1
-    end
-    bench_stop(runner, "cfg.summary() 200k calls")
-
-    # Bench 6: clamp() utility — 500k iterations
-    bench_start(runner, 500000)
-    let c = 0
-    while c < 500000
-        pkg::clamp(c, 0, 100)
-        c += 1
-    end
-    bench_stop(runner, "clamp() utility 500k calls")
-
-    # Bench 7: repeat_string() utility — 10k iterations
-    bench_start(runner, 10000)
-    let r = 0
-    while r < 10000
-        pkg::repeat_string("bench", 10)
-        r += 1
-    end
-    bench_stop(runner, "repeat_string() 10k calls")
+    bench_stop(runner, "window config 100k calls")
 
     bench_summary(runner)
 end

@@ -1,0 +1,105 @@
+## gui/core/geometry — headless rectangle math
+##
+## Part of the Alya Language package ecosystem (https://github.com/alya-lang).
+## Pure integer geometry used by layout, hit-testing, and damage regions.
+## No OS interaction: fully covered by `alya test` on headless CI.
+
+import "../types.alya"
+
+## Returns the pixel area of a rect (`0` when empty).
+pub function rect_area(r: Rect) -> int
+    return r.area()
+end
+
+## Returns 1 when the rect is empty, 0 otherwise.
+pub function rect_is_empty(r: Rect) -> int
+    return r.is_empty()
+end
+
+## Returns 1 when point (`x`, `y`) lies inside the rect.
+pub function rect_contains(r: Rect, x: int, y: int) -> int
+    return r.contains(x, y)
+end
+
+## Returns 1 when point `p` lies inside the rect.
+pub function rect_contains_point(r: Rect, p: Point) -> int
+    return r.contains(p.x, p.y)
+end
+
+## Returns 1 when the two rects overlap with positive area.
+pub function rect_intersects(a: Rect, b: Rect) -> int
+    if a.is_empty() == 1 or b.is_empty() == 1
+        return 0
+    end
+    if a.x + a.w <= b.x or b.x + b.w <= a.x
+        return 0
+    end
+    if a.y + a.h <= b.y or b.y + b.h <= a.y
+        return 0
+    end
+    return 1
+end
+
+## Returns the overlap region, or an empty rect when there is none.
+pub function rect_intersect(a: Rect, b: Rect) -> Rect
+    if rect_intersects(a, b) == 0
+        return Rect { x: 0, y: 0, w: 0, h: 0 }
+    end
+    let x0 = a.x
+    if b.x > x0
+        x0 = b.x
+    end
+    let y0 = a.y
+    if b.y > y0
+        y0 = b.y
+    end
+    let x1 = a.x + a.w
+    if b.x + b.w < x1
+        x1 = b.x + b.w
+    end
+    let y1 = a.y + a.h
+    if b.y + b.h < y1
+        y1 = b.y + b.h
+    end
+    return Rect { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }
+end
+
+## Returns the smallest rect enclosing both inputs.
+pub function rect_union(a: Rect, b: Rect) -> Rect
+    if a.is_empty() == 1
+        return b
+    end
+    if b.is_empty() == 1
+        return a
+    end
+    let x0 = a.x
+    if b.x < x0
+        x0 = b.x
+    end
+    let y0 = a.y
+    if b.y < y0
+        y0 = b.y
+    end
+    let x1 = a.x + a.w
+    if b.x + b.w > x1
+        x1 = b.x + b.w
+    end
+    let y1 = a.y + a.h
+    if b.y + b.h > y1
+        y1 = b.y + b.h
+    end
+    return Rect { x: x0, y: y0, w: x1 - x0, h: y1 - y0 }
+end
+
+## Shrinks the rect by `dx`/`dy` on every side (flooring at zero size).
+pub function rect_inset(r: Rect, dx: int, dy: int) -> Rect
+    let w = r.w - dx * 2
+    let h = r.h - dy * 2
+    if w < 0
+        w = 0
+    end
+    if h < 0
+        h = 0
+    end
+    return Rect { x: r.x + dx, y: r.y + dy, w: w, h: h }
+end

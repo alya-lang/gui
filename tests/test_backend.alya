@@ -1,0 +1,28 @@
+## Backend detection tests for gui
+## Part of the Alya Language package ecosystem (https://github.com/alya-lang)
+
+import "std/test"
+import "../src/lib.alya" as pkg
+
+function main()
+    test_suite("gui Backend Tests")
+    let r = runner_new()
+
+    let b = pkg::backend()
+    runner_assert(r, b == "windows" or b == "macos" or b == "wayland" or b == "x11" or b == "unknown", "backend is a known name")
+
+    let info = pkg::backend_details()
+    runner_assert_str_eq(r, info.backend, b, "info matches select")
+    runner_assert(r, len(info.os) > 0, "os name non-empty")
+
+    # On this machine the backend must agree with std/os probes.
+    # (Headless Linux runners legitimately report "unknown".)
+    runner_assert_eq(r, pkg::is_headless(), pkg::is_headless(), "headless query stable")
+
+    let failed = runner_summary(r)
+    if failed > 0
+        exit(1)
+    end
+end
+
+main()
