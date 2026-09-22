@@ -1,0 +1,32 @@
+[package]
+name = "gui"
+version = "0.1.0"
+alya-version = "0.0.19"
+entry = "src/lib.alya"
+description = "Native cross-platform GUI toolkit: windowing, widgets, layout, and 2D canvas for Alya"
+authors = ["Alya Language Contributors <https://github.com/alya-lang>"]
+license = "MIT"
+homepage = "https://github.com/alya-lang/alya"
+repository = "https://github.com/alya-lang/gui"
+keywords = ["alya", "alya-lang", "package", "gui", "c", "ffi"]
+
+[dependencies]
+
+[build]
+c-sources = ["c/gui.c"]
+c-flags = ["-O2"]
+c-include-dirs = ["c"]
+links = "gui"
+
+# [lint]
+# disabled_rules = []
+# exclude = []
+
+# [fmt]
+# exclude = []
+
+# [test]
+# exclude = []
+
+# [bench]
+# exclude = []
