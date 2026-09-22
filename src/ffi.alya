@@ -1,6 +1,6 @@
 # Native C FFI declarations for gui
 # Part of the Alya Language package ecosystem (https://github.com/alya-lang)
 
-extern "C"
+extern "C" from "gui"
     function alya_gui_add(a: i32, b: i32) -> i32
 end

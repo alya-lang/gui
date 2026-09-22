@@ -6,6 +6,7 @@
 
 import "./types.alya"
 import "./core/formatter.alya"
+import "./ffi.alya"
 
 # ───────────────────────────────────────────────────────────────
 # Primary Facade APIs
@@ -175,7 +176,6 @@ end
 pub function repeat_string(label: string, count: int) -> array
     return repeat_label(label, count)
 end
-
 
 ## Native C FFI helper function
 pub function c_add(a: int = 0, b: int = 0) -> int
