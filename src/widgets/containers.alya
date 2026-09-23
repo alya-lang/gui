@@ -1,0 +1,176 @@
+## gui/widgets/containers — stack, scroll, and splitter state models
+##
+## Part of the Alya Language package ecosystem (https://github.com/alya-lang).
+## Headless container logic: indexed stacks, scroll offsets with clamping,
+## and proportional splits. No window is ever opened.
+
+import "../types.alya"
+import "./node.alya"
+
+## Creates a stack container (`value` is the visible child index, `-1` empty).
+pub function stack_new(id: string) -> Widget
+    let w = widget_new("stack", id)
+    w.value = -1
+    return w
+end
+
+## Selects a child index (clamped); returns the selected index (`-1` empty).
+pub function stack_select(stack: Widget, index: int) -> int
+    if stack is null
+        return -1
+    end
+    let n = len(stack.children)
+    if n == 0
+        stack.value = -1
+        return -1
+    end
+    let idx = index
+    if idx < 0
+        idx = 0
+    end
+    if idx >= n
+        idx = n - 1
+    end
+    stack.value = idx
+    return idx
+end
+
+## Returns the visible child index (`-1` when empty).
+pub function stack_selected(stack: Widget) -> int
+    if stack is null
+        return -1
+    end
+    if len(stack.children) == 0
+        return -1
+    end
+    return stack.value
+end
+
+## Scroll offset state against a viewport/content pair.
+##
+## ### Fields
+## - `scroll_x`: Horizontal offset (>= 0).
+## - `scroll_y`: Vertical offset (>= 0).
+## - `view_w`: Viewport width.
+## - `view_h`: Viewport height.
+## - `content_w`: Content width.
+## - `content_h`: Content height.
+pub struct ScrollState
+    scroll_x: int,
+    scroll_y: int,
+    view_w: int,
+    view_h: int,
+    content_w: int,
+    content_h: int
+end
+
+## Creates a scroll state clamped to valid ranges.
+pub function scroll_state_new(view_w: int, view_h: int, content_w: int, content_h: int) -> ScrollState
+    return ScrollState {
+        scroll_x: 0,
+        scroll_y: 0,
+        view_w: view_w,
+        view_h: view_h,
+        content_w: content_w,
+        content_h: content_h
+    }
+end
+
+## Maximum horizontal offset (`0` when content fits).
+pub function scroll_max_x(st: ScrollState) -> int
+    if st is null
+        return 0
+    end
+    let m = st.content_w - st.view_w
+    if m < 0
+        return 0
+    end
+    return m
+end
+
+## Maximum vertical offset (`0` when content fits).
+pub function scroll_max_y(st: ScrollState) -> int
+    if st is null
+        return 0
+    end
+    let m = st.content_h - st.view_h
+    if m < 0
+        return 0
+    end
+    return m
+end
+
+## Moves offsets, clamped into range; returns `1`.
+pub function scroll_to(st: ScrollState, x: int, y: int) -> int
+    if st is null
+        return 0
+    end
+    st.scroll_x = scroll_clamp_value(x, scroll_max_x(st))
+    st.scroll_y = scroll_clamp_value(y, scroll_max_y(st))
+    return 1
+end
+
+## Moves offsets relatively (clamped); returns `1`.
+pub function scroll_by(st: ScrollState, dx: int, dy: int) -> int
+    if st is null
+        return 0
+    end
+    return scroll_to(st, st.scroll_x + dx, st.scroll_y + dy)
+end
+
+# Clamps `v` into [`0`, `hi`].
+function scroll_clamp_value(v: int, hi: int) -> int
+    if v < 0
+        return 0
+    end
+    if v > hi
+        return hi
+    end
+    return v
+end
+
+## Creates a splitter holding a first-pane percentage (0-100).
+pub function splitter_new(id: string, ratio: int) -> Widget
+    let w = widget_new("splitter", id)
+    w.value = splitter_clamp_ratio(ratio)
+    return w
+end
+
+## Sets the first-pane percentage (clamped 0-100); returns it.
+pub function splitter_set_ratio(sp: Widget, ratio: int) -> int
+    if sp is null
+        return 0
+    end
+    sp.value = splitter_clamp_ratio(ratio)
+    return sp.value
+end
+
+# Clamps a percentage into [0, 100].
+function splitter_clamp_ratio(ratio: int) -> int
+    if ratio < 0
+        return 0
+    end
+    if ratio > 100
+        return 100
+    end
+    return ratio
+end
+
+## Splits `container` per `ratio`: `vertical = 1` left/right, else top/bottom.
+##
+## Returns `[first, second]` (`[]` for null containers... never null: always
+## two rects; ratios clamp).
+pub function split_rects(container: Rect, ratio: int, vertical: int) -> array
+    let out = []
+    let r = splitter_clamp_ratio(ratio)
+    if vertical == 0
+        let h0 = (container.h * r) / 100
+        out.push(Rect { x: container.x, y: container.y, w: container.w, h: h0 })
+        out.push(Rect { x: container.x, y: container.y + h0, w: container.w, h: container.h - h0 })
+    else
+        let w0 = (container.w * r) / 100
+        out.push(Rect { x: container.x, y: container.y, w: w0, h: container.h })
+        out.push(Rect { x: container.x + w0, y: container.y, w: container.w - w0, h: container.h })
+    end
+    return out
+end

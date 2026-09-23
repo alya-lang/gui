@@ -1,0 +1,62 @@
+## Container state tests for gui
+## Part of the Alya Language package ecosystem (https://github.com/alya-lang)
+
+import "std/test"
+import "../src/lib.alya" as pkg
+
+function main()
+    test_suite("gui Container Tests")
+    let r = runner_new()
+
+    # 1. Stack selection with clamping
+    let st = pkg::stack("pages")
+    runner_assert_eq(r, pkg::stack_selected(st), -1, "empty stack is -1")
+    runner_assert_eq(r, pkg::stack_pick(st, 0), -1, "pick on empty is -1")
+    let p0 = pkg::label("p0", "a")
+    let p1 = pkg::label("p1", "b")
+    let p2 = pkg::label("p2", "c")
+    pkg::widget_add_child(st, p0)
+    pkg::widget_add_child(st, p1)
+    pkg::widget_add_child(st, p2)
+    runner_assert_eq(r, pkg::stack_pick(st, 1), 1, "pick middle")
+    runner_assert_eq(r, pkg::stack_selected(st), 1, "selected tracked")
+    runner_assert_eq(r, pkg::stack_pick(st, 99), 2, "pick clamped to last")
+    runner_assert_eq(r, pkg::stack_pick(st, -5), 0, "pick clamped to first")
+
+    # 2. Scroll offsets with clamping
+    let sc = pkg::scrollstate(200, 100, 500, 400)
+    runner_assert_eq(r, pkg::scrollmove(sc, 1000, -50), 1, "scroll returns 1")
+    runner_assert_eq(r, sc.scroll_x, 300, "x clamped to max")
+    runner_assert_eq(r, sc.scroll_y, 0, "y floored at zero")
+    runner_assert_eq(r, pkg::scrollmove(sc, 50, 70), 1, "scroll inside range")
+    runner_assert_eq(r, sc.scroll_x, 50, "x set")
+    runner_assert_eq(r, sc.scroll_y, 70, "y set")
+    let fit = pkg::scrollstate(500, 500, 100, 100)
+    runner_assert_eq(r, pkg::scrollmove(fit, 30, 40), 1, "scroll fitting content")
+    runner_assert_eq(r, fit.scroll_x, 0, "no horizontal room")
+    runner_assert_eq(r, fit.scroll_y, 0, "no vertical room")
+
+    # 3. Splitter ratio and rect splitting
+    let sp = pkg::splitter("main", 150)
+    runner_assert_eq(r, sp.value, 100, "ratio clamped to 100")
+    runner_assert_eq(r, pkg::splitter_set_ratio(sp, 30), 30, "ratio set")
+    let parts: Rect[] = pkg::split(pkg::rect(0, 0, 200, 100), 30, 1)
+    runner_assert_eq(r, len(parts), 2, "two panes")
+    let f0: Rect = parts[0]
+    let f1: Rect = parts[1]
+    runner_assert_eq(r, f0.w, 60, "first pane width")
+    runner_assert_eq(r, f1.x, 60, "second pane x")
+    runner_assert_eq(r, f1.w, 140, "second pane width")
+    let hp: Rect[] = pkg::split(pkg::rect(0, 0, 200, 100), 50, 0)
+    let h0: Rect = hp[0]
+    let h1: Rect = hp[1]
+    runner_assert_eq(r, h0.h, 50, "horizontal first height")
+    runner_assert_eq(r, h1.y, 50, "horizontal second y")
+
+    let failed = runner_summary(r)
+    if failed > 0
+        exit(1)
+    end
+end
+
+main()

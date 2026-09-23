@@ -142,6 +142,13 @@ main()
 | `dropdown(id, options, selected)` | `pub function` | Dropdown with clamped selected index. |
 | `listview(id, items)` | `pub function` | List view, initially unselected (`value = -1`). |
 | `radio_group_select(root, group, id)` | `pub function` | Group-exclusive radio selection. |
+| `stack(id)` | `pub function` | Stack container (selected index in `value`, `-1` empty). |
+| `stack_pick(stack, index)` | `pub function` | Clamped child selection. |
+| `scrollstate(vw, vh, cw, ch)` | `pub function` | Scroll offset state for a viewport/content pair. |
+| `scrollmove(st, x, y)` | `pub function` | Clamped offset move. |
+| `splitter(id, ratio)` | `pub function` | Splitter holding a first-pane percentage. |
+| `split(container, ratio, vertical)` | `pub function` | `[first, second]` pane rects. |
+| `ScrollState` | `pub struct` | Scroll offsets plus viewport/content sizes. |
 | `signal(v)` | `pub function` | Observable value container. |
 | `signal_value(s)` / `signal_assign(s, v)` | `pub function` | Payload read / change-notifying write. |
 | `signal_observe(s, cb)` | `pub function` | Subscribes `fn(sig)`; returns watcher count. |

@@ -13,6 +13,7 @@ import "./core/state.alya"
 import "./core/layout.alya"
 import "./widgets/node.alya"
 import "./widgets/controls.alya"
+import "./widgets/containers.alya"
 import "./ffi.alya"
 
 ## Creates a window configuration with validated dimensions.
@@ -141,6 +142,36 @@ end
 ## Creates a list view with items.
 pub function listview(id: string, items: array) -> Widget
     return listview_new(id, items)
+end
+
+## Creates a stack container (see `stack_new`).
+pub function stack(id: string) -> Widget
+    return stack_new(id)
+end
+
+## Selects a stack child (see `stack_select`).
+pub function stack_pick(stack: Widget, index: int) -> int
+    return stack_select(stack, index)
+end
+
+## Creates scroll offset state (see `scroll_state_new`).
+pub function scrollstate(view_w: int, view_h: int, content_w: int, content_h: int) -> ScrollState
+    return scroll_state_new(view_w, view_h, content_w, content_h)
+end
+
+## Moves scroll offsets (see `scroll_to`).
+pub function scrollmove(st: ScrollState, x: int, y: int) -> int
+    return scroll_to(st, x, y)
+end
+
+## Creates a splitter holding a percentage (see `splitter_new`).
+pub function splitter(id: string, ratio: int) -> Widget
+    return splitter_new(id, ratio)
+end
+
+## Splits a container per ratio (see `split_rects`).
+pub function split(container: Rect, ratio: int, vertical: int) -> array
+    return split_rects(container, ratio, vertical)
 end
 
 ## Dispatches a point click over a widget tree (see `dispatch_click`).
