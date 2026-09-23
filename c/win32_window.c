@@ -10,6 +10,7 @@
 #define UNICODE
 #define _UNICODE
 #include <windows.h>
+#include <imm.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -22,6 +23,7 @@ struct alya_gui_window {
     int32_t height;
     int32_t mouse_x;
     int32_t mouse_y;
+    int32_t ime_result;
     int32_t head;
     int32_t tail;
     alya_gui_event_t queue[ALYA_GUI_MAX_EVENTS];
@@ -71,6 +73,74 @@ static void alya_gui_set_text(const char *utf8, size_t len) {
     n = len < ALYA_GUI_TEXT_STASH - 1 ? len : ALYA_GUI_TEXT_STASH - 1;
     memcpy(alya_gui_text_stash, utf8, n);
     alya_gui_text_stash[n] = '\0';
+}
+
+// Copies a UTF-16 buffer into the TEXT_INPUT stash (truncated).
+static int alya_gui_utf8_encode(char *out, unsigned cp);
+
+static void alya_gui_set_wtext(const wchar_t *w, int wlen) {
+    char tmp[ALYA_GUI_TEXT_STASH];
+    int n = 0;
+    int i = 0;
+    unsigned high = 0;
+    while (i < wlen && n < ALYA_GUI_TEXT_STASH - 1) {
+        unsigned unit = (unsigned)w[i++];
+        unsigned cp;
+        char utf8[4];
+        int k;
+        int m;
+        if (unit >= 0xD800 && unit <= 0xDBFF) {
+            high = unit;
+            continue;
+        }
+        if (unit >= 0xDC00 && unit <= 0xDFFF && high != 0) {
+            cp = 0x10000 + ((high - 0xD800) << 10) + (unit - 0xDC00);
+            high = 0;
+        } else {
+            high = 0;
+            cp = unit;
+        }
+        if (cp < 0x20 || cp == 0x7F) {
+            continue;
+        }
+        k = alya_gui_utf8_encode(utf8, cp);
+        if (n + k > ALYA_GUI_TEXT_STASH - 1) {
+            break;
+        }
+        for (m = 0; m < k; m++) {
+            tmp[n++] = utf8[m];
+        }
+    }
+    tmp[n] = '\0';
+    alya_gui_set_text(tmp, (size_t)n);
+}
+
+// Reads an IMM composition/result string into the stash; returns its
+// character count (0 when empty/unavailable).
+static int alya_gui_imm_string(HWND hwnd, unsigned long kind) {
+    HIMC himc;
+    LONG n;
+    wchar_t buf[64];
+    LONG got;
+    himc = ImmGetContext(hwnd);
+    if (himc == NULL) {
+        return 0;
+    }
+    n = ImmGetCompositionStringW(himc, kind, NULL, 0);
+    if (n <= 0) {
+        ImmReleaseContext(hwnd, himc);
+        return 0;
+    }
+    if (n > (LONG)(sizeof(buf) - sizeof(wchar_t))) {
+        n = (LONG)(sizeof(buf) - sizeof(wchar_t));
+    }
+    got = ImmGetCompositionStringW(himc, kind, buf, (unsigned long)n);
+    ImmReleaseContext(hwnd, himc);
+    if (got <= 0) {
+        return 0;
+    }
+    alya_gui_set_wtext(buf, (int)(got / (LONG)sizeof(wchar_t)));
+    return (int)(got / (LONG)sizeof(wchar_t));
 }
 
 // Encodes one code point as UTF-8; returns the byte count (1-4).
@@ -193,6 +263,38 @@ static LRESULT CALLBACK alya_gui_wndproc(HWND hwnd, UINT msg, WPARAM wparam,
     case WM_KILLFOCUS:
         alya_gui_push_event(win, ALYA_GUI_EVENT_FOCUS, 0);
         return 0;
+    case WM_IME_STARTCOMPOSITION:
+        alya_gui_push_event(win, ALYA_GUI_EVENT_IME_START, 0);
+        win->ime_result = 0;
+        break;
+    case WM_IME_COMPOSITION: {
+        unsigned long flags = (unsigned long)lparam;
+        if (flags & 0x0800) {
+            // GCS_RESULTSTR: final string commits the composition.
+            if (alya_gui_imm_string(hwnd, 0x0800) > 0) {
+                alya_gui_push_event(win, ALYA_GUI_EVENT_IME_END, 0);
+            }
+            win->ime_result = 1;
+            return 0;
+        }
+        if (flags & 0x0008) {
+            // GCS_COMPSTR: live preview replaces the previous one.
+            if (alya_gui_imm_string(hwnd, 0x0008) > 0) {
+                alya_gui_push_event(win, ALYA_GUI_EVENT_IME_UPDATE, 0);
+            }
+            return 0;
+        }
+        break;
+    }
+    case WM_IME_ENDCOMPOSITION:
+        // A result already closed the composition via IME_END; only an
+        // empty end remains to report.
+        if (win->ime_result == 0) {
+            alya_gui_set_text("", 0);
+            alya_gui_push_event(win, ALYA_GUI_EVENT_IME_END, 0);
+        }
+        win->ime_result = 0;
+        break;
     case WM_DESTROY:
         win->open = 0;
         return 0;
@@ -375,6 +477,34 @@ void *alya_gui_window_native_handle(alya_gui_window_t *win) {
         return NULL;
     }
     return (void *)win->hwnd;
+}
+
+int32_t alya_gui_a11y_notify(alya_gui_window_t *win, int32_t code) {
+    unsigned event_id;
+    if (win == NULL || win->hwnd == NULL) {
+        return 0;
+    }
+    // WinEvents (MSAA/UIA bridge): 1 = focus, 2 = value, 3 = selection,
+    // 4 = state; anything else announces a name change.
+    switch (code) {
+    case 1:
+        event_id = 0x8005; // EVENT_OBJECT_FOCUS
+        break;
+    case 2:
+        event_id = 0x800E; // EVENT_OBJECT_VALUECHANGE
+        break;
+    case 3:
+        event_id = 0x8006; // EVENT_OBJECT_SELECTION
+        break;
+    case 4:
+        event_id = 0x800A; // EVENT_OBJECT_STATECHANGE
+        break;
+    default:
+        event_id = 0x800C; // EVENT_OBJECT_NAMECHANGE
+        break;
+    }
+    NotifyWinEvent(event_id, win->hwnd, (LONG)(0xFFFFFFFC), 0);
+    return 1;
 }
 
 static alya_gui_event_t alya_gui_stashed = {0, 0, 0, 0, 0, 0};

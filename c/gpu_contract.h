@@ -46,6 +46,14 @@ int32_t alya_gpu_surface_present(alya_gpu_surface_t *surf);
 int32_t alya_gpu_surface_resize(alya_gpu_surface_t *surf, int32_t width,
                                 int32_t height);
 
+// Draws UTF-8 text at (`x`, `y`) in `size_px` pixels (`color` 0xRRGGBB).
+// Windows draws straight onto the render target (DirectWrite);
+// macOS stages into the bitmap (CoreText, shown on next present);
+// Linux returns 0 (font-stack follow-up). Returns 1 when drawn.
+int32_t alya_gpu_surface_text(alya_gpu_surface_t *surf, const char *utf8,
+                              int32_t x, int32_t y, int32_t size_px,
+                              int32_t color);
+
 #ifdef __cplusplus
 }
 #endif

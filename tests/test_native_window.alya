@@ -85,9 +85,14 @@ function main()
         let bs = pkg::surface(64, 48, 255)
         runner_assert_eq(r, pkg::gpu_blit(bs, gs), 3072, "gpu blit staged all pixels")
         runner_assert_eq(r, pkg::gpu_present(gs), 1, "gpu present shown")
+        runner_assert_eq(r, pkg::gpu_text(gs, "Alya", 8, 8, 20, 16777215), 1, "gpu text drawn")
         runner_assert_eq(r, pkg::gpu_resize(gs, 32, 24), 1, "gpu resize ok")
         runner_assert_eq(r, pkg::gpu_destroy(gs), 1, "gpu destroy ok")
     end
+
+    # 3d. Screen-reader notification reaches the OS on a live window
+    runner_assert_eq(r, pkg::a11y_notify(win, 1), 1, "a11y focus notified")
+    runner_assert_eq(r, pkg::a11y_notify(win, 2), 1, "a11y value notified")
 
     # 4. Graceful close -> CLOSE event -> not open
     runner_assert_eq(r, pkg::native_request_close(win), 1, "close requested")
@@ -104,8 +109,7 @@ function main()
     runner_assert_eq(r, pkg::native_is_open(win), 0, "closed after event")
 
     # 4. Null safety
-    runner_assert_eq(r, pkg::native_poll(null), 0, "poll null is 0")
-    runner_assert_eq(r, pkg::native_drain(null, pkg::event_queue()), 0, "drain null win is 0")
+    runner_assert_eq(r, pkg::native_poll(null), 0, "poll null is 0")    runner_assert_eq(r, pkg::native_drain(null, pkg::event_queue()), 0, "drain null win is 0")
     runner_assert_eq(r, pkg::native_drain(win, null), 0, "drain null queue is 0")
     runner_assert_eq(r, pkg::native_is_open(null), 0, "is_open null is 0")
     runner_assert_eq(r, pkg::native_destroy(null), 1, "destroy null safe")

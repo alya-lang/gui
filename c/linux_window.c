@@ -65,6 +65,8 @@ struct alya_gui_window {
     Display *xdisplay;
     Window xwindow;
     Atom xwm_delete;
+    XIM xim;
+    XIC xic;
 };
 
 static void alya_gui_push_event(alya_gui_window_t *win, int32_t kind,
@@ -659,6 +661,20 @@ static alya_gui_window_t *x11_window_create(const char *title, int32_t width,
                      ButtonPressMask | ButtonReleaseMask | KeyPressMask |
                      KeyReleaseMask | FocusChangeMask);
     win->active = ALYA_GUI_LINUX_X11;
+    // XIM input method for composed text (CJK etc.); plain KeySym path
+    // below stays the fallback when no IM answers.
+    win->xim = XOpenIM(display, NULL, NULL, NULL);
+    if (win->xim != NULL) {
+        win->xic = XCreateIC(win->xim, XNInputStyle,
+                             (long)(XIMPreeditNothing | XIMStatusNothing),
+                             XNClientWindow, window, XNFocusWindow, window,
+                             NULL);
+        if (win->xic == NULL) {
+            XCloseIM(win->xim);
+            win->xim = NULL;
+        }
+    }
+    win->active = ALYA_GUI_LINUX_X11;
     win->open = 1;
     win->width = width;
     win->height = height;
@@ -668,6 +684,14 @@ static alya_gui_window_t *x11_window_create(const char *title, int32_t width,
 static void x11_window_destroy(alya_gui_window_t *win) {
     if (win == NULL) {
         return;
+    }
+    if (win->xic != NULL) {
+        XDestroyIC(win->xic);
+        win->xic = NULL;
+    }
+    if (win->xim != NULL) {
+        XCloseIM(win->xim);
+        win->xim = NULL;
     }
     if (win->xdisplay != NULL) {
         if (win->xwindow != 0) {
@@ -710,6 +734,10 @@ static int32_t x11_window_poll(alya_gui_window_t *win, alya_gui_event_t *out) {
     while (XPending(display) > 0) {
         XEvent ev;
         XNextEvent(display, &ev);
+        // Let the input method filter composed-text events first.
+        if (win->xic != NULL && XFilterEvent(&ev, None)) {
+            continue;
+        }
         switch (ev.type) {
         case ClientMessage:
             if ((Atom)ev.xclient.data.l[0] == win->xwm_delete) {
@@ -748,12 +776,23 @@ static int32_t x11_window_poll(alya_gui_window_t *win, alya_gui_event_t *out) {
         case KeyPress:
         case KeyRelease: {
             // KeySym identifies the key (layout-dependent); printable text
-            // additionally arrives via XLookupString (no IME here).
+            // prefers the XIM path (composed CJK), else XLookupString.
             KeySym sym = XLookupKeysym(&ev.xkey, 0);
             if (ev.type == KeyPress) {
                 char text[64];
-                int n = XLookupString(&ev.xkey, text, (int)sizeof(text) - 1,
+                int n = 0;
+                if (win->xic != NULL) {
+                    Status status = 0;
+                    n = Xutf8LookupString(win->xic, &ev.xkey, text,
+                                          (int)sizeof(text) - 1, &sym,
+                                          &status);
+                    if (status == XBufferOverflow) {
+                        n = 0;
+                    }
+                } else {
+                    n = XLookupString(&ev.xkey, text, (int)sizeof(text) - 1,
                                       NULL, NULL);
+                }
                 alya_gui_push_event(win, ALYA_GUI_EVENT_KEY_DOWN,
                                     (int32_t)sym);
                 if (n > 0 && (unsigned char)text[0] >= 0x20) {
@@ -767,9 +806,15 @@ static int32_t x11_window_poll(alya_gui_window_t *win, alya_gui_event_t *out) {
             break;
         }
         case FocusIn:
+            if (win->xic != NULL) {
+                XSetICFocus(win->xic);
+            }
             alya_gui_push_event(win, ALYA_GUI_EVENT_FOCUS, 1);
             break;
         case FocusOut:
+            if (win->xic != NULL) {
+                XUnsetICFocus(win->xic);
+            }
             alya_gui_push_event(win, ALYA_GUI_EVENT_FOCUS, 0);
             break;
         default:
@@ -1144,6 +1189,15 @@ const char *alya_gui_event_text(void) {
     return alya_gui_text_stash;
 }
 
+int32_t alya_gui_a11y_notify(alya_gui_window_t *win, int32_t code) {
+    (void)win;
+    (void)code;
+    // Linux screen readers ride AT-SPI over the session bus, which needs
+    // the bus registry dance plus the provider tree (struct-array FFI:
+    // see a11y_contract.h). Honest stub until that follow-up lands.
+    return 0;
+}
+
 // --- GPU surface: Wayland shm upload, X11 XPutImage ---
 //
 // Staged XRGB reaches the screen without EGL: on Wayland through a
@@ -1403,4 +1457,19 @@ int32_t alya_gpu_surface_resize(alya_gpu_surface_t *surf, int32_t width,
     surf->height = height;
     // The shm pool is recreated lazily on the next present.
     return 1;
+}
+
+// Text rasterization wants a font stack (freetype/fontconfig); until
+// that follow-up lands, canvas text on Linux stays GPU-surface-free.
+// Honest stub so the contract links everywhere.
+int32_t alya_gpu_surface_text(alya_gpu_surface_t *surf, const char *utf8,
+                              int32_t x, int32_t y, int32_t size_px,
+                              int32_t color) {
+    (void)surf;
+    (void)utf8;
+    (void)x;
+    (void)y;
+    (void)size_px;
+    (void)color;
+    return 0;
 }

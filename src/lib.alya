@@ -234,6 +234,38 @@ pub function focus_widget(st: InputState, root: Widget, id: string) -> int
     return input_focus(st, root, id)
 end
 
+## Moves focus to the next (`dir >= 0`) or previous widget (see `input_tab_next`).
+pub function focus_next(st: InputState, root: Widget, dir: int = 1) -> int
+    return input_tab_next(st, root, dir)
+end
+
+## Starts an IME composition on the focused input (see `dispatch_ime_start`).
+pub function ime_start(st: InputState, root: Widget) -> int
+    return dispatch_ime_start(st, root)
+end
+
+## Updates the IME preview string (see `dispatch_ime_update`).
+pub function ime_update(st: InputState, root: Widget, text: string) -> int
+    return dispatch_ime_update(st, root, text)
+end
+
+## Ends the composition, committing text (see `dispatch_ime_end`).
+pub function ime_end(st: InputState, root: Widget, text: string) -> int
+    return dispatch_ime_end(st, root, text)
+end
+
+## Returns the in-progress IME composition (see `input_composing`).
+pub function composing_text(st: InputState) -> string
+    return input_composing(st)
+end
+
+## Fires one screen-reader notification for the bound window
+## (`1` = focus, `2` = value, `3` = selection, `4` = state;
+## see `native_a11y_notify`). Returns `1` when delivered.
+pub function a11y_notify(win, code: int) -> int
+    return native_a11y_notify(win, code)
+end
+
 ## Maps a widget kind to its cursor style (see `cursor_for`).
 pub function cursor(kind: string) -> string
     return cursor_for(kind)
@@ -334,6 +366,11 @@ pub function gpu_resize(surf, width: int, height: int) -> int
     return native_gpu_resize(surf, width, height)
 end
 
+## Draws UTF-8 text on a GPU surface (see `native_gpu_text`).
+pub function gpu_text(surf, text: string, x: int, y: int, size_px: int, color: int) -> int
+    return native_gpu_text(surf, text, x, y, size_px, color)
+end
+
 ## Blits a software surface to a GPU surface: stages every pixel of the
 ## surface image, then presents. The GPU surface must match the image
 ## dimensions (extra pixels are ignored, missing ones stay zeroed).
@@ -371,6 +408,31 @@ end
 ## Arranges children in a uniform grid (see `layout_grid`).
 pub function grid(container: Rect, padding: int, spacing: int, cols: int, cell_h: int, count: int) -> Rect[]
     return layout_grid(container, padding, spacing, cols, cell_h, count)
+end
+
+## Expands a rect by outer margin (see `layout_margin`).
+pub function margin(rect: Rect, m: int) -> Rect
+    return layout_margin(rect, m)
+end
+
+## Assigns solver rects onto children in order (see `layout_place`).
+pub function place(parent: Widget, rects: array) -> int
+    return layout_place(parent, rects)
+end
+
+## Dispatches a click with parent bubbling (see `dispatch_bubble`).
+pub function bubble(root: Widget, x: int, y: int) -> int
+    return dispatch_bubble(root, x, y)
+end
+
+## Collects dirty visible widget ids depth-first (see `widget_collect_dirty`).
+pub function dirty_ids(root: Widget) -> array
+    return widget_collect_dirty(root)
+end
+
+## Clears redraw flags on a sub-tree (see `widget_clear_subtree`).
+pub function dirty_clear(root: Widget) -> int
+    return widget_clear_subtree(root)
 end
 
 ## Creates a solid-color pixel canvas (see `image_new`).

@@ -21,6 +21,9 @@ typedef struct alya_gui_window alya_gui_window_t;
 #define ALYA_GUI_EVENT_TEXT_INPUT 8
 #define ALYA_GUI_EVENT_FOCUS 9
 #define ALYA_GUI_EVENT_REDRAW 10
+#define ALYA_GUI_EVENT_IME_START 11
+#define ALYA_GUI_EVENT_IME_UPDATE 12
+#define ALYA_GUI_EVENT_IME_END 13
 
 typedef struct alya_gui_event {
     int32_t kind;
@@ -48,5 +51,10 @@ int32_t alya_gui_event_mouse_x(void);
 int32_t alya_gui_event_mouse_y(void);
 int32_t alya_gui_event_key(void);
 const char *alya_gui_event_text(void);
+
+// Screen-reader notification (see win32_window.h for codes). Linux
+// AT-SPI needs the session-bus registry + provider tree, so this is an
+// honest stub returning 0 until that follow-up lands. Safe on NULL.
+int32_t alya_gui_a11y_notify(alya_gui_window_t *win, int32_t code);
 
 #endif

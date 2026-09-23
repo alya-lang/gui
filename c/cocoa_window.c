@@ -496,6 +496,37 @@ const char *alya_gui_event_text(void) {
     return alya_gui_text_stash;
 }
 
+// AppKit accessibility post (declared manually like the runtime API).
+typedef struct objc_object *alya_ax_id;
+extern void NSAccessibilityPostNotification(alya_ax_id element,
+                                            alya_ax_id notification);
+
+int32_t alya_gui_a11y_notify(alya_gui_window_t *win, int32_t code) {
+    const char *name;
+    if (win == NULL || win->window == NULL) {
+        return 0;
+    }
+    // 1 = focus, 2 = value, 3 = selection, 4 = state; window-level
+    // granularity until the provider tree lands (see a11y_contract.h).
+    switch (code) {
+    case 1:
+        name = "AXFocusedUIElementChanged";
+        break;
+    case 3:
+        name = "AXSelectedChildrenChanged";
+        break;
+    case 4:
+        name = "AXTitleChanged";
+        break;
+    case 2:
+    default:
+        name = "AXValueChanged";
+        break;
+    }
+    NSAccessibilityPostNotification((alya_ax_id)win->window, alya_str(name));
+    return 1;
+}
+
 // --- GPU surface: CoreGraphics bitmap composited via CALayer ---
 //
 // Software-drawn XRGB stages straight into the bitmap context (zero copy);
@@ -504,6 +535,7 @@ const char *alya_gui_event_text(void) {
 // still compiles everywhere (pure C, no ObjC syntax, no SDK headers).
 #ifdef __APPLE__
 #include <CoreGraphics/CoreGraphics.h>
+#include <CoreText/CoreText.h>
 #endif
 
 struct alya_gpu_surface {
@@ -625,8 +657,7 @@ int32_t alya_gpu_surface_resize(alya_gpu_surface_t *surf, int32_t width,
 #ifdef __APPLE__
     CGColorSpaceRef cs;
     CGContextRef ctx;
-    void *data;
-    if (surf == NULL || width <= 0 || height <= 0) {
+    void *data;    if (surf == NULL || width <= 0 || height <= 0) {
         return 0;
     }
     // Release the old bitmap in place (the layer pointer stays valid),
@@ -666,6 +697,87 @@ int32_t alya_gpu_surface_resize(alya_gpu_surface_t *surf, int32_t width,
     (void)surf;
     (void)width;
     (void)height;
+    return 0;
+#endif
+}
+
+// Draws UTF-8 text into the staged bitmap (next present shows it).
+// CoreText draws bottom-up, so the context is y-flipped around the call.
+int32_t alya_gpu_surface_text(alya_gpu_surface_t *surf, const char *utf8,
+                              int32_t x, int32_t y, int32_t size_px,
+                              int32_t color) {
+#ifdef __APPLE__
+    CFStringRef str;
+    CFStringRef font_name;
+    CTFontRef font;
+    CFStringRef keys[1];
+    CFTypeRef values[1];
+    CFDictionaryRef attrs_dict;
+    CFAttributedStringRef attr;
+    CTLineRef line;
+    CGContextRef ctx;
+    CGFloat r;
+    CGFloat g;
+    CGFloat b;
+    if (surf == NULL || surf->cgctx == NULL || utf8 == NULL ||
+        utf8[0] == '\0' || size_px <= 0) {
+        return 0;
+    }
+    str = CFStringCreateWithCString(NULL, utf8, kCFStringEncodingUTF8);
+    font_name = CFStringCreateWithCString(NULL, "Helvetica", kCFStringEncodingUTF8);
+    if (str == NULL || font_name == NULL) {
+        if (str != NULL) {
+            CFRelease(str);
+        }
+        if (font_name != NULL) {
+            CFRelease(font_name);
+        }
+        return 0;
+    }
+    font = CTFontCreateWithName(font_name, (double)size_px, NULL);
+    CFRelease(font_name);
+    if (font == NULL) {
+        CFRelease(str);
+        return 0;
+    }
+    keys[0] = (CFStringRef)kCTFontAttributeName;
+    values[0] = font;
+    attrs_dict = CFDictionaryCreate(NULL, (const void **)keys,
+                                    (const void **)values, 1,
+                                    &kCFTypeDictionaryKeyCallBacks,
+                                    &kCFTypeDictionaryValueCallBacks);
+    attr = CFAttributedStringCreate(NULL, str, attrs_dict);
+    CFRelease(str);
+    CFRelease(attrs_dict);
+    CFRelease(font);
+    if (attr == NULL) {
+        return 0;
+    }
+    line = CTLineCreateWithAttributedString(attr);
+    CFRelease(attr);
+    if (line == NULL) {
+        return 0;
+    }
+    ctx = (CGContextRef)surf->cgctx;
+    CGContextSaveGState(ctx);
+    CGContextTranslateCTM(ctx, 0.0, (double)surf->height);
+    CGContextScaleCTM(ctx, 1.0, -1.0);
+    r = (double)((color >> 16) & 0xFF) / 255.0;
+    g = (double)((color >> 8) & 0xFF) / 255.0;
+    b = (double)(color & 0xFF) / 255.0;
+    CGContextSetRGBFillColor(ctx, r, g, b, 1.0);
+    CGContextSetTextPosition(ctx, (double)x, (double)(surf->height - y));
+    CTLineDraw(line, ctx);
+    CGContextRestoreGState(ctx);
+    CFRelease(line);
+    return 1;
+#else
+    (void)surf;
+    (void)utf8;
+    (void)x;
+    (void)y;
+    (void)size_px;
+    (void)color;
     return 0;
 #endif
 }

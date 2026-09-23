@@ -17,6 +17,7 @@ function main()
     runner_assert_eq(r, pkg::gpu_stage(null, 0, 255), 0, "gpu stage null is 0")
     runner_assert_eq(r, pkg::gpu_present(null), 0, "gpu present null is 0")
     runner_assert_eq(r, pkg::gpu_resize(null, 8, 8), 0, "gpu resize null is 0")
+    runner_assert_eq(r, pkg::gpu_text(null, "hi", 0, 0, 16, 255), 0, "gpu text null is 0")
     runner_assert_eq(r, pkg::gpu_blit(null, null), 0, "gpu blit null is 0")
 
     let s = pkg::surface(4, 3, 255)

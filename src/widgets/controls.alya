@@ -257,3 +257,29 @@ function slider_value_from_x(slider: Widget, x: int) -> int
     end
     return lo + (rel * (hi - lo)) / span
 end
+
+## Dispatches a point click with bubbling: hit-tests from `root`, then
+## fires the first `on_click` walking from the target up to `root`.
+##
+## Unlike `dispatch_click` (kind-specific activation), bubbling serves
+## container-level handlers (clickable rows, cards): a button without its
+## own handler lets the parent card react. Disabled nodes never fire.
+## Returns `1` when a handler ran, else `0`.
+pub function dispatch_bubble(root: Widget, x: int, y: int) -> int
+    if root is null
+        return 0
+    end
+    let node = widget_hit(root, x, y)
+    while node is not null
+        if node.enabled == 1 and node.on_click is not null
+            let cb = node.on_click
+            cb(node)
+            return 1
+        end
+        if node.id == root.id
+            return 0
+        end
+        node = widget_parent(root, node.id)
+    end
+    return 0
+end

@@ -12,6 +12,15 @@ pub function layout_padding(container: Rect, padding: int) -> Rect
     return rect_inset(container, padding, padding)
 end
 
+## Expands a rect by `margin` on every side (outer spacing of a child).
+pub function layout_margin(rect: Rect, margin: int) -> Rect
+    if rect is null
+        return rect_new(0, 0, 0, 0)
+    end
+    let m = margin * 2
+    return rect_new(rect.x - margin, rect.y - margin, rect.w + m, rect.h + m)
+end
+
 ## Stacks child sizes top-down inside `container`.
 ##
 ## Each child keeps its declared size; the row width fills the inner width.

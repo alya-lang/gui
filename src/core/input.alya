@@ -17,20 +17,22 @@ import "../widgets/node.alya"
 import "../widgets/controls.alya"
 import "./state.alya"
 
-## Per-window input state: focus/hover/pressed widget ids plus the last
-## known mouse position. Ids (not pointers) survive tree rebuilds; every
-## dispatch re-resolves them, so stale ids safely miss.
+## Per-window input state: focus/hover/pressed widget ids, the last
+## known mouse position, and the in-progress IME composition string.
+## Ids (not pointers) survive tree rebuilds; every dispatch re-resolves
+## them, so stale ids safely miss.
 pub struct InputState
     focus: string,
     hover: string,
     pressed: string,
     mouse_x: int,
-    mouse_y: int
+    mouse_y: int,
+    composing: string
 end
 
-## Creates empty input state (no focus, hover, or press).
+## Creates empty input state (no focus, hover, press, or composition).
 pub function input_new() -> InputState
-    return InputState { focus: "", hover: "", pressed: "", mouse_x: 0, mouse_y: 0 }
+    return InputState { focus: "", hover: "", pressed: "", mouse_x: 0, mouse_y: 0, composing: "" }
 end
 
 ## Returns the focused widget id (`""` when none).
@@ -88,7 +90,78 @@ pub function input_blur(st: InputState) -> int
         return 0
     end
     st.focus = ""
+    st.composing = ""
     return 1
+end
+
+## Moves keyboard focus to the next (`dir >= 0`) or previous (`dir < 0`)
+## focusable widget in depth-first order, wrapping around.
+## Returns `1` when focus moved, `0` when nothing is focusable.
+pub function input_tab_next(st: InputState, root: Widget, dir: int) -> int
+    if st is null or root is null
+        return 0
+    end
+    let ids = focus_order(root)
+    if len(ids) == 0
+        return 0
+    end
+    let at = focus_index(ids, st.focus)
+    if dir < 0
+        at -= 1
+        if at < 0
+            at = len(ids) - 1
+        end
+    else
+        at += 1
+        if at >= len(ids)
+            at = 0
+        end
+    end
+    st.focus = ids[at]
+    st.composing = ""
+    return 1
+end
+
+# Depth-first ids of focusable, enabled, visible widgets.
+function focus_order(root: Widget) -> array
+    let out = []
+    focus_collect(root, out)
+    return out
+end
+
+function focus_collect(w: Widget, out: array) -> int
+    if w is null or w.visible == 0 or w.enabled == 0
+        return 0
+    end
+    if input_is_focusable(w.kind) == 1 and w.id != ""
+        out.push(w.id)
+    end
+    let i = 0
+    while i < len(w.children)
+        focus_collect(w.children[i], out)
+        i += 1
+    end
+    return len(out)
+end
+
+# Index of `id` in `ids` (`-1` when absent, so Tab starts at the edge).
+function focus_index(ids: array, id: string) -> int
+    let i = 0
+    while i < len(ids)
+        if ids[i] == id
+            return i
+        end
+        i += 1
+    end
+    return -1
+end
+
+## Returns the in-progress IME composition (`""` when none).
+pub function input_composing(st: InputState) -> string
+    if st is null
+        return ""
+    end
+    return st.composing
 end
 
 ## Routes mouse motion: updates the position, refreshes hover to the
@@ -180,7 +253,13 @@ pub function dispatch_key(st: InputState, root: Widget, key: int) -> int
     end
     if key == 27
         st.focus = ""
+        st.composing = ""
         return 1
+    end
+    if key == 9
+        // Tab cycles focus (Shift+Tab is indistinguishable by key code
+        // alone; shift-aware traversal stays display-side work).
+        return input_tab_next(st, root, 1)
     end
     if st.focus == ""
         return 0
@@ -241,8 +320,9 @@ end
 ## Applies one queued `GuiEvent` to the tree; returns the handler result.
 ##
 ## Mouse kinds drive the press/release pairing, KeyDown/TextInput route to
-## focus, Focus syncs native focus (`key == 1` focuses the hovered widget,
-## `0` blurs). Close/Resize/Redraw are observed, not consumed (return `0`).
+## focus, IME kinds drive the composition state machine, Focus syncs native
+## focus (`key == 1` focuses the hovered widget, `0` blurs). Close/Resize/
+## Redraw are observed, not consumed (return `0`).
 pub function dispatch_event(st: InputState, root: Widget, ev: GuiEvent) -> int
     if st is null or ev is null
         return 0
@@ -262,6 +342,15 @@ pub function dispatch_event(st: InputState, root: Widget, ev: GuiEvent) -> int
     if ev.kind == GuiEventKind.TextInput
         return dispatch_text(st, root, ev.text)
     end
+    if ev.kind == GuiEventKind.ImeStart
+        return dispatch_ime_start(st, root)
+    end
+    if ev.kind == GuiEventKind.ImeUpdate
+        return dispatch_ime_update(st, root, ev.text)
+    end
+    if ev.kind == GuiEventKind.ImeEnd
+        return dispatch_ime_end(st, root, ev.text)
+    end
     if ev.kind == GuiEventKind.Focus
         if ev.key == 0
             return input_blur(st)
@@ -272,6 +361,64 @@ pub function dispatch_event(st: InputState, root: Widget, ev: GuiEvent) -> int
         return 0
     end
     return 0
+end
+
+## Starts an IME composition on the focused text input: clears any stale
+## preview. Returns `1` when a live input has focus, else `0`.
+pub function dispatch_ime_start(st: InputState, root: Widget) -> int
+    if ime_target(st, root) is null
+        return 0
+    end
+    st.composing = ""
+    return 1
+end
+
+## Updates the IME preview string (kept in state, not yet committed).
+## Returns `1` when a live input has focus, else `0`.
+pub function dispatch_ime_update(st: InputState, root: Widget, text: string) -> int
+    if ime_target(st, root) is null
+        return 0
+    end
+    if text is null
+        st.composing = ""
+    else
+        st.composing = text
+    end
+    return 1
+end
+
+## Ends the composition, committing `text` (or the preview when `text`
+## is empty) into the focused input. Fires `on_change`, marks dirty.
+## Returns `1` when committed, else `0`.
+pub function dispatch_ime_end(st: InputState, root: Widget, text: string) -> int
+    let target = ime_target(st, root)
+    if target is null
+        if st is not null
+            st.composing = ""
+        end
+        return 0
+    end
+    let final = text
+    if final is null or final == ""
+        final = st.composing
+    end
+    st.composing = ""
+    return textinput_append(target, final)
+end
+
+# The focused, enabled text input/area, or null.
+function ime_target(st: InputState, root: Widget)
+    if st is null or root is null or st.focus == ""
+        return null
+    end
+    let target = widget_find(root, st.focus)
+    if target is null or target.enabled == 0
+        return null
+    end
+    if target.kind != "textinput" and target.kind != "textarea"
+        return null
+    end
+    return target
 end
 
 ## Maps a widget kind to its cursor style (`"text"` for editors,

@@ -20,6 +20,9 @@ typedef struct alya_gui_window alya_gui_window_t;
 #define ALYA_GUI_EVENT_TEXT_INPUT 8
 #define ALYA_GUI_EVENT_FOCUS 9
 #define ALYA_GUI_EVENT_REDRAW 10
+#define ALYA_GUI_EVENT_IME_START 11
+#define ALYA_GUI_EVENT_IME_UPDATE 12
+#define ALYA_GUI_EVENT_IME_END 13
 
 // Single pumped event: kind + client size + mouse position + key code.
 // `key` carries the platform key code for KEY_DOWN/KEY_UP (Win32 VK,
@@ -70,6 +73,12 @@ void alya_gui_window_close(alya_gui_window_t *win);
 // Direct2D surface backend (`c/d2d_surface.c`) bind its render target
 // without exposing Win32 types in the shared contract.
 void *alya_gui_window_native_handle(alya_gui_window_t *win);
+
+// Fires one screen-reader notification for the bound window:
+// 1 = focus, 2 = value, 3 = selection, 4 = state (WinEvents on
+// Windows, NSAccessibility on macOS, unsupported stub on Linux).
+// Returns 1 when delivered, 0 otherwise. Safe on NULL.
+int32_t alya_gui_a11y_notify(alya_gui_window_t *win, int32_t code);
 
 // Polls once and stashes the event for the scalar readers below.
 // Returns the event kind (0 when the queue is empty).

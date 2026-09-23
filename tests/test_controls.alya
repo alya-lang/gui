@@ -11,6 +11,13 @@ function note_change(_w)
     return 1
 end
 
+let bubbled = []
+
+function note_bubble(w)
+    bubbled.push(w.id)
+    return 1
+end
+
 function main()
     test_suite("gui Controls Tests")
     let r = runner_new()
@@ -89,7 +96,23 @@ function main()
     let gnone = pkg::grid(pkg::rect(0, 0, 200, 200), 10, 5, 0, 40, 5)
     runner_assert_eq(r, len(gnone), 0, "grid zero cols empty")
 
-    let failed = runner_summary(r)
+    # 8. Bubble propagation: target handler first, else parent card
+    let card = pkg::widget("box", "card")
+    pkg::widget_set_rect(card, pkg::rect(0, 0, 200, 100))
+    let inner = pkg::button("inner", "Go")
+    pkg::widget_set_rect(inner, pkg::rect(10, 10, 80, 30))
+    pkg::widget_add_child(card, inner)
+    pkg::widget_on_click(card, note_bubble)
+    runner_assert_eq(r, pkg::bubble(card, 15, 15), 1, "bubble reaches card handler")
+    runner_assert_str_eq(r, bubbled[0], "card", "card handler fired")
+    pkg::widget_on_click(inner, note_bubble)
+    runner_assert_eq(r, pkg::bubble(card, 15, 15), 1, "target handler wins")
+    runner_assert_str_eq(r, bubbled[1], "inner", "inner handler fired")
+    runner_assert_eq(r, pkg::bubble(card, 150, 80), 1, "card background bubbles to card")
+    runner_assert_eq(r, pkg::bubble(card, 250, 250), 0, "bubble miss is 0")
+    let lone = pkg::widget("box", "lone")
+    pkg::widget_set_rect(lone, pkg::rect(0, 0, 50, 50))
+    runner_assert_eq(r, pkg::bubble(lone, 10, 10), 0, "no handler is 0")    let failed = runner_summary(r)
     if failed > 0
         exit(1)
     end

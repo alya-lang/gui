@@ -108,6 +108,34 @@ pub function widget_find(root: Widget, id: string)
     return null
 end
 
+## Returns the parent of `id` under `root` (null for missing ids and
+## for `root` itself, which has no parent).
+pub function widget_parent(root: Widget, id: string)
+    if root is null or id is null or root.id == id
+        return null
+    end
+    return parent_search(root, id)
+end
+
+# Depth-first parent search: the node whose children contain `id`.
+function parent_search(node: Widget, id: string)
+    if node is null
+        return null
+    end
+    let i = 0
+    while i < len(node.children)
+        if node.children[i].id == id
+            return node
+        end
+        let found = parent_search(node.children[i], id)
+        if found is not null
+            return found
+        end
+        i += 1
+    end
+    return null
+end
+
 ## Deepest visible child containing (`x`, `y`); falls back to `root`
 ## itself when it contains the point, else null. Invisible subtrees
 ## never participate.
@@ -238,4 +266,65 @@ pub function widget_set_enabled(w: Widget, flag: int) -> int
     end
     w.enabled = 1
     return 1
+end
+
+## Collects the ids of dirty, visible nodes depth-first (the damage list
+## native backends consult for selective sub-tree repaints).
+pub function widget_collect_dirty(root: Widget) -> array
+    let out = []
+    dirty_collect(root, out)
+    return out
+end
+
+# Depth-first damage collection (invisible subtrees never repaint).
+function dirty_collect(w: Widget, out: array) -> int
+    if w is null or w.visible == 0
+        return 0
+    end
+    if w.dirty == 1
+        out.push(w.id)
+    end
+    let i = 0
+    while i < len(w.children)
+        dirty_collect(w.children[i], out)
+        i += 1
+    end
+    return len(out)
+end
+
+## Clears the redraw flag on the whole visible sub-tree; returns the
+## cleared count.
+pub function widget_clear_subtree(root: Widget) -> int
+    if root is null or root.visible == 0
+        return 0
+    end
+    let n = 0
+    if root.dirty == 1
+        root.dirty = 0
+        n = 1
+    end
+    let i = 0
+    while i < len(root.children)
+        n = n + widget_clear_subtree(root.children[i])
+        i += 1
+    end
+    return n
+end
+
+## Assigns solver `rects` onto the children of `parent` in order
+## (the bridge from the pure solver to the retained tree).
+## Returns the placed count (`0` for null parents or rect lists).
+pub function layout_place(parent: Widget, rects: array) -> int
+    if parent is null or rects is null
+        return 0
+    end
+    let n = 0
+    let i = 0
+    while i < len(rects) and i < len(parent.children)
+        let r: Rect = rects[i]
+        parent.children[i].rect = r
+        n += 1
+        i += 1
+    end
+    return n
 end

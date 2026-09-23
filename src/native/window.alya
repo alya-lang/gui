@@ -30,6 +30,8 @@ extern "C"
     function alya_gpu_surface_stage(surf: ptr, index: i32, color: i32) -> i32
     function alya_gpu_surface_present(surf: ptr) -> i32
     function alya_gpu_surface_resize(surf: ptr, width: i32, height: i32) -> i32
+    function alya_gui_a11y_notify(native_win: ptr, code: i32) -> i32
+    function alya_gpu_surface_text(surf: ptr, text: str, x: i32, y: i32, size_px: i32, color: i32) -> i32
 end
 
 ## Opens a native window; returns null when creation fails.
@@ -140,6 +142,28 @@ pub function native_gpu_resize(surf, width: int, height: int) -> int
         return 0
     end
     return alya_gpu_surface_resize(surf, width, height)
+end
+
+## Draws UTF-8 text at (`x`, `y`) in `size_px` pixels (see contract for
+## per-OS coverage). Returns `1` when drawn. Null-safe.
+pub function native_gpu_text(surf, text: string, x: int, y: int, size_px: int, color: int) -> int
+    if surf is null or text is null or text == ""
+        return 0
+    end
+    return alya_gpu_surface_text(surf, text, x, y, size_px, color)
+end
+
+## Fires one screen-reader notification for a native window.
+##
+## Codes: `1` focus, `2` value, `3` selection, `4` state. Backends map
+## them onto WinEvents (Windows), `NSAccessibility` notifications
+## (macOS), or report unsupported (Linux AT-SPI needs the session-bus
+## registry + provider tree — documented follow-up). Null-safe.
+pub function native_a11y_notify(win, code: int) -> int
+    if win is null
+        return 0
+    end
+    return alya_gui_a11y_notify(win, code)
 end
 
 ## Drains all pending native events into `q` as `GuiEvent` records.
