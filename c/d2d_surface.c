@@ -33,7 +33,7 @@ typedef struct {
 } ALYA_GUID;
 
 static const ALYA_GUID ALYA_IID_ID2D1Factory = {
-    0x06152247, 0x6f50, 0x465a, {0x92, 0x45, 0x11, 0x8b, 0x28, 0xd6, 0x9f, 0x88}};
+    0x06152247, 0x6f50, 0x465a, {0x92, 0x45, 0x11, 0x8b, 0xfd, 0x3b, 0x60, 0x07}};
 
 #define ALYA_D2D1_FACTORY_TYPE_SINGLE_THREADED 0
 #define ALYA_DXGI_FORMAT_B8G8R8A8_UNORM 87
@@ -91,11 +91,11 @@ struct AlyaD2D1BitmapVtbl {
     void *GetPixelSize;
     void *GetPixelFormat;
     void *GetDpi;
+    void *CopyFromBitmap;
+    void *CopyFromRenderTarget;
     HRESULT(STDMETHODCALLTYPE *CopyFromMemory)(AlyaD2D1Bitmap *,
                                               const AlyaD2D1RectF *,
                                               const void *, unsigned int);
-    void *CopyFromRenderTarget;
-    void *CopyFromBitmap;
 };
 
 typedef struct AlyaD2D1RenderTargetVtbl AlyaD2D1RenderTargetVtbl;
@@ -137,7 +137,10 @@ struct AlyaD2D1RenderTargetVtbl {
     void *FillGeometry;
     void *FillMesh;
     void *FillOpacityMask;
-    void *DrawOpacityMask;
+    void(STDMETHODCALLTYPE *DrawBitmap)(AlyaD2D1RenderTarget *,
+                                       AlyaD2D1Bitmap *,
+                                       const AlyaD2D1RectF *, float, int,
+                                       const AlyaD2D1RectF *);
     void *DrawText;
     void(STDMETHODCALLTYPE *DrawTextLayout)(AlyaD2D1RenderTarget *, const void *,
                                            const void *, const void *, int);
@@ -160,10 +163,6 @@ struct AlyaD2D1RenderTargetVtbl {
     void *PushAxisAlignedClip;
     void *PopAxisAlignedClip;
     void *Clear;
-    void(STDMETHODCALLTYPE *DrawBitmap)(AlyaD2D1RenderTarget *,
-                                       AlyaD2D1Bitmap *,
-                                       const AlyaD2D1RectF *, float, int,
-                                       const AlyaD2D1RectF *);
     void(STDMETHODCALLTYPE *BeginDraw)(AlyaD2D1RenderTarget *);
     HRESULT(STDMETHODCALLTYPE *EndDraw)(AlyaD2D1RenderTarget *, void *, void *);
     void *GetPixelFormat;
@@ -211,57 +210,10 @@ struct AlyaD2D1FactoryVtbl {
 typedef HRESULT(STDMETHODCALLTYPE *AlyaD2D1CreateFactoryFn)(
     int, const ALYA_GUID *, const void *, void **);
 
-// --- Minimal DirectWrite declarations (vtable order matches dwrite.h) ---
-// Only Release is ever called on format/layout objects, so three-slot
-// vtables suffice (Release sits at index 2 on every COM interface).
-
-typedef struct {
-    HRESULT(STDMETHODCALLTYPE *QueryInterface)(void *, const void *, void **);
-    ULONG(STDMETHODCALLTYPE *AddRef)(void *);
-    ULONG(STDMETHODCALLTYPE *Release)(void *);
-} AlyaDWriteUnknown;
-
-static const ALYA_GUID ALYA_IID_IDWriteFactory = {
-    0xb859ee5a, 0xd838, 0x4b5b,
-    {0xa2, 0xe8, 0x1a, 0xdc, 0x7d, 0x93, 0xdb, 0x48}};
-
-typedef struct AlyaDWriteFactoryVtbl AlyaDWriteFactoryVtbl;
-typedef struct {
-    const AlyaDWriteFactoryVtbl *lpVtbl;
-} AlyaDWriteFactory;
-
-struct AlyaDWriteFactoryVtbl {
-    HRESULT(STDMETHODCALLTYPE *QueryInterface)(AlyaDWriteFactory *,
-                                              const void *, void **);
-    ULONG(STDMETHODCALLTYPE *AddRef)(AlyaDWriteFactory *);
-    ULONG(STDMETHODCALLTYPE *Release)(AlyaDWriteFactory *);
-    void *GetSystemFontCollection;
-    void *CreateCustomFontCollection;
-    void *RegisterFontCollectionLoader;
-    void *UnregisterFontCollectionLoader;
-    void *CreateFontFace;
-    void *CreateRenderingParams;
-    void *CreateMonitorRenderingParams;
-    void *CreateCustomRenderingParams;
-    void *RegisterFontFileLoader;
-    void *UnregisterFontFileLoader;
-    HRESULT(STDMETHODCALLTYPE *CreateTextFormat)(
-        AlyaDWriteFactory *, const wchar_t *, const void *, int, int, int,
-        float, const wchar_t *, AlyaDWriteUnknown **);
-    void *CreateTypography;
-    void *GetGdiInterop;
-    HRESULT(STDMETHODCALLTYPE *CreateTextLayout)(
-        AlyaDWriteFactory *, const wchar_t *, unsigned int,
-        AlyaDWriteUnknown *, float, float, AlyaDWriteUnknown **);
-    void *CreateGdiCompatibleTextLayout;
-    void *CreateEllipsisTrimmingSign;
-    void *CreateTextAnalyzer;
-    void *CreateNumberSubstitution;
-    void *CreateGlyphRunAnalysis;
-};
-
-typedef HRESULT(STDMETHODCALLTYPE *AlyaDWriteCreateFactoryFn)(
-    int, const ALYA_GUID *, void **);
+// --- Text via classic GDI (TextOutW): zero COM risk, ClearType by
+// default, available on every Windows. Drawn over the last presented
+// bitmap as an overlay (DirectWrite child objects faulted on this
+// machine's dwrite.dll, so DWrite stays out until that is understood).
 
 typedef struct {
     float x;
@@ -282,6 +234,7 @@ struct alya_gpu_surface {
     uint32_t *staging;
     int32_t width;
     int32_t height;
+    HWND hwnd;
 };
 
 extern void *alya_gui_window_native_handle(void *win);
@@ -325,6 +278,7 @@ alya_gpu_surface_t *alya_gpu_surface_create(void *native_win, int32_t width,
     }
     surf->width = width;
     surf->height = height;
+    surf->hwnd = hwnd;
 
     d2d = LoadLibraryW(L"d2d1.dll");
     if (d2d == NULL) {
@@ -422,88 +376,50 @@ int32_t alya_gpu_surface_present(alya_gpu_surface_t *surf) {
     return hr >= 0 ? 1 : 0;
 }
 
-// Draws UTF-8 text straight onto the render target (overlaying the last
-// presented bitmap). Returns 1 when glyphs were drawn.
+// Draws UTF-8 text over the window via GDI (overlaying the last presented
+// bitmap). Returns 1 when the text was drawn.
 int32_t alya_gpu_surface_text(alya_gpu_surface_t *surf, const char *utf8,
                               int32_t x, int32_t y, int32_t size_px,
                               int32_t color) {
-    static AlyaDWriteFactory *dw = NULL;
-    HMODULE mod;
-    AlyaDWriteCreateFactoryFn create_factory;
+    HDC hdc;
     wchar_t wtext[128];
-    wchar_t wfamily[32];
     int wlen;
-    AlyaDWriteUnknown *format = NULL;
-    AlyaDWriteUnknown *layout = NULL;
-    AlyaD2D1ColorF col;
-    void *brush = NULL;
-    AlyaD2D1PointF origin;
-    HRESULT hr;
-    if (surf == NULL || surf->target == NULL || utf8 == NULL ||
+    HFONT font;
+    HGDIOBJ old;
+    unsigned long col;
+    int ok;
+    if (surf == NULL || surf->hwnd == NULL || utf8 == NULL ||
         utf8[0] == '\0' || size_px <= 0) {
         return 0;
-    }
-    if (dw == NULL) {
-        mod = LoadLibraryW(L"dwrite.dll");
-        if (mod == NULL) {
-            return 0;
-        }
-        create_factory = (AlyaDWriteCreateFactoryFn)(void *)GetProcAddress(
-            mod, "DWriteCreateFactory");
-        if (create_factory == NULL) {
-            return 0;
-        }
-        if (create_factory(0, &ALYA_IID_IDWriteFactory, (void **)&dw) < 0 ||
-            dw == NULL) {
-            dw = NULL;
-            return 0;
-        }
     }
     wlen = MultiByteToWideChar(CP_UTF8, 0, utf8, -1, wtext, 127);
     if (wlen <= 1) {
         return 0;
     }
-    wlen -= 1; // exclude the NUL from the layout length
-    {
-        const wchar_t *fam = L"Segoe UI";
-        int i = 0;
-        while (fam[i] != 0 && i < 31) {
-            wfamily[i] = fam[i];
-            i += 1;
-        }
-        wfamily[i] = 0;
-    }
-    hr = dw->lpVtbl->CreateTextFormat(dw, wfamily, NULL, 400, 0, 5,
-                                      (float)size_px, L"", &format);
-    if (hr < 0 || format == NULL) {
+    wlen -= 1; // exclude the NUL from the drawn length
+    hdc = GetDC(surf->hwnd);
+    if (hdc == NULL) {
         return 0;
     }
-    hr = dw->lpVtbl->CreateTextLayout(
-        dw, wtext, (unsigned int)wlen, format,
-        (float)(surf->width - x), (float)(surf->height - y), &layout);
-    format->Release((void *)format);
-    if (hr < 0 || layout == NULL) {
+    // Negative height = character height; CLEARTYPE_QUALITY = 5.
+    font = CreateFontW(-size_px, 0, 0, 0, 400, 0, 0, 0, 1, 0, 0, 5, 0,
+                       L"Segoe UI");
+    if (font == NULL) {
+        ReleaseDC(surf->hwnd, hdc);
         return 0;
     }
-    col.r = (float)((color >> 16) & 0xFF) / 255.0f;
-    col.g = (float)((color >> 8) & 0xFF) / 255.0f;
-    col.b = (float)(color & 0xFF) / 255.0f;
-    col.a = 1.0f;
-    hr = surf->target->lpVtbl->CreateSolidColorBrush(surf->target, &col, NULL,
-                                                     &brush);
-    if (hr < 0 || brush == NULL) {
-        layout->Release((void *)layout);
-        return 0;
-    }
-    origin.x = (float)x;
-    origin.y = (float)y;
-    surf->target->lpVtbl->BeginDraw(surf->target);
-    surf->target->lpVtbl->DrawTextLayout(surf->target, layout, &origin, brush,
-                                         0);
-    hr = surf->target->lpVtbl->EndDraw(surf->target, NULL, NULL);
-    layout->Release((void *)layout);
-    ((AlyaDWriteUnknown *)brush)->Release(brush);
-    return hr >= 0 ? 1 : 0;
+    // COLORREF is 0x00BBGGRR; our color is 0xRRGGBB.
+    col = ((unsigned long)(color & 0xFF) << 16) |
+          (unsigned long)(color & 0xFF00) |
+          ((unsigned long)((color >> 16) & 0xFF));
+    SetBkMode(hdc, 1); // TRANSPARENT
+    SetTextColor(hdc, col);
+    old = SelectObject(hdc, font);
+    ok = TextOutW(hdc, (int)x, (int)y, wtext, (unsigned)wlen);
+    SelectObject(hdc, old);
+    DeleteObject(font);
+    ReleaseDC(surf->hwnd, hdc);
+    return ok ? 1 : 0;
 }
 
 int32_t alya_gpu_surface_resize(alya_gpu_surface_t *surf, int32_t width,
