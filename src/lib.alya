@@ -174,6 +174,16 @@ pub function split(container: Rect, ratio: int, vertical: int) -> array
     return split_rects(container, ratio, vertical)
 end
 
+## Returns the screen-reader role for a widget (see `accessible_role`).
+pub function a11y_role(w: Widget) -> int
+    return accessible_role(w)
+end
+
+## Returns the accessible label for a widget (see `accessible_label`).
+pub function a11y_label(w: Widget) -> string
+    return accessible_label(w)
+end
+
 ## Dispatches a point click over a widget tree (see `dispatch_click`).
 pub function click(root: Widget, x: int, y: int) -> int
     return dispatch_click(root, x, y)

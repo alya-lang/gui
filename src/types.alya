@@ -35,7 +35,29 @@ pub enum GuiEventKind
     KeyUp = 7,
     TextInput = 8,
     Focus = 9,
-    Redraw = 10
+    Redraw = 10,
+    ImeStart = 11,
+    ImeUpdate = 12,
+    ImeEnd = 13
+end
+
+## Screen-reader roles for widgets (Phase 6 accessibility milestone).
+##
+## Every widget maps to exactly one role; see `accessible_role`.
+pub enum AccessibleRole
+    Unknown = 0,
+    Window = 1,
+    Button = 2,
+    Label = 3,
+    TextField = 4,
+    Checkbox = 5,
+    RadioButton = 6,
+    Slider = 7,
+    ProgressBar = 8,
+    Dropdown = 9,
+    List = 10,
+    Container = 11,
+    Canvas = 12
 end
 
 # ───────────────────────────────────────────────────────────────

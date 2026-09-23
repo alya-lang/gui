@@ -1,0 +1,52 @@
+## Accessibility contract tests for gui
+## Part of the Alya Language package ecosystem (https://github.com/alya-lang)
+
+import "std/test"
+import "../src/lib.alya" as pkg
+
+function main()
+    test_suite("gui Accessibility Tests")
+    let r = runner_new()
+
+    # 1. Event kind values are stable (IME appended, nothing renumbered)
+    runner_assert_eq(r, pkg::GuiEventKind.Redraw, 10, "Redraw still 10")
+    runner_assert_eq(r, pkg::GuiEventKind.ImeStart, 11, "ImeStart is 11")
+    runner_assert_eq(r, pkg::GuiEventKind.ImeUpdate, 12, "ImeUpdate is 12")
+    runner_assert_eq(r, pkg::GuiEventKind.ImeEnd, 13, "ImeEnd is 13")
+
+    # 2. Role enum values are stable
+    runner_assert_eq(r, pkg::AccessibleRole.Button, 2, "Button role")
+    runner_assert_eq(r, pkg::AccessibleRole.TextField, 4, "TextField role")
+    runner_assert_eq(r, pkg::AccessibleRole.Canvas, 12, "Canvas role")
+
+    # 3. Every control maps to its role
+    runner_assert_eq(r, pkg::a11y_role(pkg::button("b", "OK")), 2, "button role")
+    runner_assert_eq(r, pkg::a11y_role(pkg::label("l", "Hi")), 3, "label role")
+    runner_assert_eq(r, pkg::a11y_role(pkg::textinput("t", "")), 4, "textinput role")
+    runner_assert_eq(r, pkg::a11y_role(pkg::textarea("ta", "")), 4, "textarea role")
+    runner_assert_eq(r, pkg::a11y_role(pkg::checkbox("c", 0)), 5, "checkbox role")
+    runner_assert_eq(r, pkg::a11y_role(pkg::radio("r", "g", 0)), 6, "radio role")
+    runner_assert_eq(r, pkg::a11y_role(pkg::slider("s", 0, 100, 50)), 7, "slider role")
+    runner_assert_eq(r, pkg::a11y_role(pkg::progressbar("p", 0, 100, 50)), 8, "progress role")
+    runner_assert_eq(r, pkg::a11y_role(pkg::dropdown("d", ["x"])), 9, "dropdown role")
+    runner_assert_eq(r, pkg::a11y_role(pkg::listview("lv", ["x"])), 10, "listview role")
+    runner_assert_eq(r, pkg::a11y_role(pkg::widget("mystery", "m")), 11, "unknown kind is container")
+
+    # 4. Label contract: text wins, id is the fallback
+    runner_assert_str_eq(r, pkg::a11y_label(pkg::button("ok", "Confirm")), "Confirm", "text label")
+    runner_assert_str_eq(r, pkg::a11y_label(pkg::button("ok", "")), "ok", "id fallback")
+
+    # 5. IME composition rides in GuiEvent.text
+    let q = pkg::event_queue()
+    pkg::event_queue_push(q, pkg::event_new(pkg::GuiEventKind.ImeUpdate, 0, 0, 0, "nihon"))
+    let ev: GuiEvent = pkg::event_queue_poll(q)
+    runner_assert_eq(r, ev.kind, pkg::GuiEventKind.ImeUpdate, "ime kind round-trips")
+    runner_assert_str_eq(r, ev.text, "nihon", "composition text round-trips")
+
+    let failed = runner_summary(r)
+    if failed > 0
+        exit(1)
+    end
+end
+
+main()

@@ -149,6 +149,9 @@ main()
 | `splitter(id, ratio)` | `pub function` | Splitter holding a first-pane percentage. |
 | `split(container, ratio, vertical)` | `pub function` | `[first, second]` pane rects. |
 | `ScrollState` | `pub struct` | Scroll offsets plus viewport/content sizes. |
+| `a11y_role(w)` | `pub function` | Screen-reader role for a widget. |
+| `a11y_label(w)` | `pub function` | Accessible label (text, else id). |
+| `AccessibleRole` | `pub enum` | Screen-reader roles (`Button = 2`, `TextField = 4`, ...). |
 | `signal(v)` | `pub function` | Observable value container. |
 | `signal_value(s)` / `signal_assign(s, v)` | `pub function` | Payload read / change-notifying write. |
 | `signal_observe(s, cb)` | `pub function` | Subscribes `fn(sig)`; returns watcher count. |

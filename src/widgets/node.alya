@@ -129,6 +129,40 @@ pub function widget_hit(root: Widget, x: int, y: int)
     return null
 end
 
+## Returns the screen-reader role for a widget kind.
+##
+## Unknown kinds map to `AccessibleRole.Unknown`; never fails.
+pub function accessible_role(w: Widget) -> int
+    if w is null
+        return 0
+    end
+    return when w.kind
+        is "button"    => 2
+        is "label"     => 3
+        is "textinput" => 4
+        is "textarea"  => 4
+        is "checkbox"  => 5
+        is "radio"     => 6
+        is "slider"    => 7
+        is "progress"  => 8
+        is "dropdown"  => 9
+        is "listview"  => 10
+        is "canvas"    => 12
+        else           => 11
+    end
+end
+
+## Returns the accessible label: explicit text, else the widget id.
+pub function accessible_label(w: Widget) -> string
+    if w is null
+        return ""
+    end
+    if w.text != ""
+        return w.text
+    end
+    return w.id
+end
+
 ## Moves/resizes the node in parent coordinates.
 pub function widget_set_rect(w: Widget, r: Rect) -> int
     if w is null
