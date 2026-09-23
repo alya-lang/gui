@@ -18,6 +18,10 @@ import "../core/geometry.alya"
 ## - `text`: Caption or input content.
 ## - `value`: Generic state slot (checkbox checked flag).
 ## - `children`: Child widgets in paint/hit order.
+## - `options`: Option list (dropdown items, list rows).
+## - `group`: Radio group name (radio buttons with the same group are exclusive).
+## - `min_val`: Range minimum (slider, progress bar).
+## - `max_val`: Range maximum (slider, progress bar).
 ## - `on_click`: Click callback `fn(widget)` or null.
 ## - `on_change`: Change callback `fn(widget)` or null.
 pub struct Widget
@@ -29,6 +33,9 @@ pub struct Widget
     text: string,
     value: int,
     children: array,
+    options: array,
+    min_val: int,
+    max_val: int,
     on_click,
     on_change
 end
@@ -44,6 +51,10 @@ pub function widget_new(kind: string, id: string = "") -> Widget
         text: "",
         value: 0,
         children: [],
+        options: [],
+        group: "",
+        min_val: 0,
+        max_val: 100,
         on_click: null,
         on_change: null
     }

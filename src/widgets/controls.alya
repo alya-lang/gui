@@ -38,6 +38,142 @@ pub function checkbox_new(id: string, checked: int = 0) -> Widget
     return w
 end
 
+## Creates a multi-line text area with initial content.
+pub function textarea_new(id: string, text: string = "") -> Widget
+    let w = widget_new("textarea", id)
+    w.text = text
+    return w
+end
+
+## Creates a radio button in `group` (`value` is the selected flag).
+##
+## Selection is exclusive per group; see `radio_group_select`.
+pub function radio_new(id: string, group: string, selected: int = 0) -> Widget
+    let w = widget_new("radio", id)
+    w.group = group
+    if selected == 0
+        w.value = 0
+    else
+        w.value = 1
+    end
+    return w
+end
+
+## Creates a slider with clamped initial value.
+pub function slider_new(id: string, min_val: int, max_val: int, value: int) -> Widget
+    let w = widget_new("slider", id)
+    w.min_val = min_val
+    w.max_val = max_val
+    w.value = slider_clamp_value(min_val, max_val, value)
+    return w
+end
+
+## Creates a progress bar with clamped initial value.
+pub function progressbar_new(id: string, min_val: int, max_val: int, value: int) -> Widget
+    let w = widget_new("progress", id)
+    w.min_val = min_val
+    w.max_val = max_val
+    w.value = slider_clamp_value(min_val, max_val, value)
+    return w
+end
+
+## Creates a dropdown with options and a clamped selected index.
+pub function dropdown_new(id: string, options: array, selected: int = 0) -> Widget
+    let w = widget_new("dropdown", id)
+    if options is null
+        w.options = []
+    else
+        w.options = options
+    end
+    w.value = dropdown_clamp_index(w.options, selected)
+    return w
+end
+
+## Creates a list view with items (nothing selected, `value = -1`).
+pub function listview_new(id: string, items: array) -> Widget
+    let w = widget_new("listview", id)
+    if items is null
+        w.options = []
+    else
+        w.options = items
+    end
+    w.value = -1
+    return w
+end
+
+# Clamps a range value into [`lo`, `hi`] (degenerate ranges yield `lo`).
+function slider_clamp_value(lo: int, hi: int, v: int) -> int
+    if hi < lo
+        return lo
+    end
+    if v < lo
+        return lo
+    end
+    if v > hi
+        return hi
+    end
+    return v
+end
+
+# Clamps an option index into `[0, len(options) - 1]` (`-1` when empty).
+function dropdown_clamp_index(options: array, idx: int) -> int
+    if options is null or len(options) == 0
+        return -1
+    end
+    if idx < 0
+        return 0
+    end
+    if idx >= len(options)
+        return len(options) - 1
+    end
+    return idx
+end
+
+## Selects the radio `id` inside `group`, deselecting group mates.
+##
+## Searches `root` depth-first; returns `1` when the id was found
+## (fires its `on_change` when set), `0` otherwise.
+pub function radio_group_select(root: Widget, group: string, id: string) -> int
+    if root is null or group is null or id is null
+        return 0
+    end
+    let found = radio_apply(root, group, id)
+    if found == 0
+        return 0
+    end
+    let target: Widget = widget_find(root, id)
+    if target is not null and target.on_change is not null
+        let ccb = target.on_change
+        ccb(target)
+    end
+    return 1
+end
+
+# Marks the matching radio selected and its group mates deselected.
+# Returns 1 when `id` exists in `group`, 0 otherwise.
+function radio_apply(node: Widget, group: string, id: string) -> int
+    if node is null or node.visible == 0
+        return 0
+    end
+    let found = 0
+    if node.kind == "radio" and node.group == group
+        if node.id == id
+            node.value = 1
+            found = 1
+        else
+            node.value = 0
+        end
+    end
+    let i = 0
+    while i < len(node.children)
+        if radio_apply(node.children[i], group, id) == 1
+            found = 1
+        end
+        i += 1
+    end
+    return found
+end
+
 ## Attaches a click callback `fn(widget)`; returns the node for chaining.
 pub function widget_on_click(w: Widget, cb)
     if w is null
@@ -60,6 +196,8 @@ end
 ##
 ## - Button (enabled): runs `on_click` when set, returns `1`.
 ## - Checkbox (enabled): toggles `value`, runs `on_change` when set, returns `1`.
+## - Radio (enabled): selects within its group via `radio_group_select`, returns `1`.
+## - Slider (enabled): sets `value` from the x position, runs `on_change` when set, returns `1`.
 ## - Anything else, disabled nodes, or a miss: returns `0`.
 pub function dispatch_click(root: Widget, x: int, y: int) -> int
     let target = widget_hit(root, x, y)
@@ -85,5 +223,37 @@ pub function dispatch_click(root: Widget, x: int, y: int) -> int
         end
         return 1
     end
+    if target.kind == "radio"
+        return radio_group_select(root, target.group, target.id)
+    end
+    if target.kind == "slider"
+        target.value = slider_value_from_x(target, x)
+        if target.on_change is not null
+            let scb = target.on_change
+            scb(target)
+        end
+        return 1
+    end
     return 0
+end
+
+# Maps an x coordinate onto the slider range (clamped).
+function slider_value_from_x(slider: Widget, x: int) -> int
+    let span = slider.rect.w
+    if span <= 0
+        return slider.min_val
+    end
+    let rel = x - slider.rect.x
+    if rel < 0
+        rel = 0
+    end
+    if rel > span
+        rel = span
+    end
+    let lo = slider.min_val
+    let hi = slider.max_val
+    if hi < lo
+        return lo
+    end
+    return lo + (rel * (hi - lo)) / span
 end

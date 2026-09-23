@@ -130,15 +130,23 @@ main()
 | `rgb(r, g, b)` / `rgba(r, g, b, a)` | `pub function` | Opaque / transparent `Color` constructors. |
 | `vbox(container, padding, spacing, sizes)` | `pub function` | Stacks `Size[]` top-down; returns positioned `Rect[]`. |
 | `hbox(container, padding, spacing, sizes)` | `pub function` | Stacks `Size[]` left-to-right; returns positioned `Rect[]`. |
+| `grid(container, padding, spacing, cols, cell_h, count)` | `pub function` | Uniform grid cells in row-major order. |
 | `widget(kind, id)` | `pub function` | Generic retained widget node. |
 | `button(id, text)` / `label(id, text)` | `pub function` | Button and static label constructors. |
 | `textinput(id, text)` / `checkbox(id, checked)` | `pub function` | Text input and checkbox constructors. |
 | `click(root, x, y)` | `pub function` | Point-click dispatch over a widget tree (`1` consumed, `0` miss). |
+| `textarea(id, text)` | `pub function` | Multi-line text area constructor. |
+| `radio(id, group, selected)` | `pub function` | Radio button in an exclusive group. |
+| `slider(id, min, max, value)` | `pub function` | Slider with clamped value (drag-mapped on click). |
+| `progressbar(id, min, max, value)` | `pub function` | Display-only progress bar. |
+| `dropdown(id, options, selected)` | `pub function` | Dropdown with clamped selected index. |
+| `listview(id, items)` | `pub function` | List view, initially unselected (`value = -1`). |
+| `radio_group_select(root, group, id)` | `pub function` | Group-exclusive radio selection. |
 | `widget_add_child(parent, child)` | `pub function` | Appends a child; returns child count. |
 | `widget_find(root, id)` | `pub function` | Depth-first lookup by id (null when missing). |
 | `widget_hit(root, x, y)` | `pub function` | Deepest visible node containing the point. |
 | `c_add(a, b)` | `pub function` | Bundled C engine smoke test via FFI. |
-| `Widget` | `pub struct` | Retained node (`id`, `kind`, `rect`, `visible`, `enabled`, `text`, `value`, `children`, callbacks). |
+| `Widget` | `pub struct` | Retained node (`id`, `kind`, `rect`, `visible`, `enabled`, `text`, `value`, `children`, `options`, `group`, `min_val`, `max_val`, callbacks). |
 | `GuiBackend` | `pub enum` | Backend codes (`Unknown = 0`, `Windows = 1`, `MacOs = 2`, `Wayland = 3`, `X11 = 4`). |
 | `GuiEventKind` | `pub enum` | Event kinds (`Close = 1`, `MouseDown = 4`, `KeyDown = 6`, `TextInput = 8`, ...). |
 | `Point` / `Size` / `Rect` / `Color` | `pub struct` | Geometry primitives with methods (`area()`, `is_empty()`, `contains()`, `to_string()`). |

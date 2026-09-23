@@ -1,0 +1,98 @@
+## Extended controls tests for gui
+## Part of the Alya Language package ecosystem (https://github.com/alya-lang)
+
+import "std/test"
+import "../src/lib.alya" as pkg
+
+let changed = []
+
+function note_change(_w)
+    changed.push("change")
+    return 1
+end
+
+function main()
+    test_suite("gui Controls Tests")
+    let r = runner_new()
+
+    # 1. Text area stores multi-line content
+    let ta = pkg::textarea("notes", "line1\nline2")
+    runner_assert_eq(r, ta.kind, "textarea", "textarea kind")
+    runner_assert_str_eq(r, ta.text, "line1\nline2", "textarea content")
+
+    # 2. Radio group exclusivity
+    let root = pkg::widget("box", "root")
+    pkg::widget_set_rect(root, pkg::rect(0, 0, 200, 200))
+    let r1 = pkg::radio("r1", "grp", 1)
+    pkg::widget_set_rect(r1, pkg::rect(10, 10, 20, 20))
+    let r2 = pkg::radio("r2", "grp", 0)
+    pkg::widget_set_rect(r2, pkg::rect(10, 40, 20, 20))
+    let r3 = pkg::radio("r3", "other", 1)
+    pkg::widget_set_rect(r3, pkg::rect(10, 70, 20, 20))
+    pkg::widget_add_child(root, r1)
+    pkg::widget_add_child(root, r2)
+    pkg::widget_add_child(root, r3)
+    pkg::widget_on_change(r2, note_change)
+    runner_assert_eq(r, pkg::click(root, 15, 45), 1, "radio click consumed")
+    runner_assert_eq(r, r1.value, 0, "group mate deselected")
+    runner_assert_eq(r, r2.value, 1, "clicked radio selected")
+    runner_assert_eq(r, r3.value, 1, "other group untouched")
+    runner_assert_eq(r, len(changed), 1, "radio change fired")
+
+    # 3. Slider clamping and drag mapping
+    let sl = pkg::slider("vol", 0, 100, 150)
+    runner_assert_eq(r, sl.value, 100, "slider init clamped")
+    let sl2 = pkg::slider("vol2", 0, 100, -5)
+    runner_assert_eq(r, sl2.value, 0, "slider init floored")
+    pkg::widget_set_rect(sl, pkg::rect(0, 0, 200, 20))
+    let sroot = pkg::widget("box", "sroot")
+    pkg::widget_set_rect(sroot, pkg::rect(0, 0, 200, 20))
+    pkg::widget_add_child(sroot, sl)
+    pkg::widget_on_change(sl, note_change)
+    runner_assert_eq(r, pkg::click(sroot, 50, 10), 1, "slider drag consumed")
+    runner_assert_eq(r, sl.value, 25, "slider mapped from x")
+    runner_assert_eq(r, pkg::click(sroot, 500, 10), 1, "slider drag past end")
+    runner_assert_eq(r, sl.value, 100, "slider clamped at max")
+
+    # 4. Progress bar is display-only but settable at construction
+    let pb = pkg::progressbar("dl", 0, 100, 30)
+    runner_assert_eq(r, pb.value, 30, "progress value")
+    let proot = pkg::widget("box", "proot")
+    pkg::widget_set_rect(proot, pkg::rect(0, 0, 200, 20))
+    pkg::widget_add_child(proot, pb)
+    pkg::widget_set_rect(pb, pkg::rect(0, 0, 200, 20))
+    runner_assert_eq(r, pkg::click(proot, 10, 10), 0, "progress click not consumed")
+
+    # 5. Dropdown selection clamping
+    let dd = pkg::dropdown("theme", ["light", "dark"], 5)
+    runner_assert_eq(r, dd.value, 1, "dropdown index clamped")
+    runner_assert_str_eq(r, dd.options[1], "dark", "dropdown option read")
+    let dde = pkg::dropdown("empty", [])
+    runner_assert_eq(r, dde.value, -1, "empty dropdown is -1")
+
+    # 6. List view starts unselected
+    let lv = pkg::listview("files", ["a", "b", "c"])
+    runner_assert_eq(r, lv.value, -1, "list starts unselected")
+    runner_assert_eq(r, len(lv.options), 3, "list items stored")
+
+    # 7. Grid layout: 5 children in 2 columns
+    let cells: Rect[] = pkg::grid(pkg::rect(0, 0, 200, 200), 10, 5, 2, 40, 5)
+    runner_assert_eq(r, len(cells), 5, "grid five cells")
+    let g0: Rect = cells[0]
+    runner_assert_eq(r, g0.x, 10, "grid cell00 x")
+    runner_assert_eq(r, g0.y, 10, "grid cell00 y")
+    runner_assert_eq(r, g0.w, 87, "grid cell width")
+    let g1: Rect = cells[1]
+    runner_assert_eq(r, g1.x, 102, "grid cell01 x")
+    let g2: Rect = cells[2]
+    runner_assert_eq(r, g2.y, 55, "grid cell10 y")
+    let gnone = pkg::grid(pkg::rect(0, 0, 200, 200), 10, 5, 0, 40, 5)
+    runner_assert_eq(r, len(gnone), 0, "grid zero cols empty")
+
+    let failed = runner_summary(r)
+    if failed > 0
+        exit(1)
+    end
+end
+
+main()

@@ -87,6 +87,36 @@ pub function checkbox(id: string, checked: int = 0) -> Widget
     return checkbox_new(id, checked)
 end
 
+## Creates a multi-line text area.
+pub function textarea(id: string, text: string = "") -> Widget
+    return textarea_new(id, text)
+end
+
+## Creates a radio button in a group.
+pub function radio(id: string, group: string, selected: int = 0) -> Widget
+    return radio_new(id, group, selected)
+end
+
+## Creates a slider with clamped initial value.
+pub function slider(id: string, min_val: int, max_val: int, value: int) -> Widget
+    return slider_new(id, min_val, max_val, value)
+end
+
+## Creates a progress bar with clamped initial value.
+pub function progressbar(id: string, min_val: int, max_val: int, value: int) -> Widget
+    return progressbar_new(id, min_val, max_val, value)
+end
+
+## Creates a dropdown with options and selected index.
+pub function dropdown(id: string, options: array, selected: int = 0) -> Widget
+    return dropdown_new(id, options, selected)
+end
+
+## Creates a list view with items.
+pub function listview(id: string, items: array) -> Widget
+    return listview_new(id, items)
+end
+
 ## Dispatches a point click over a widget tree (see `dispatch_click`).
 pub function click(root: Widget, x: int, y: int) -> int
     return dispatch_click(root, x, y)
@@ -100,6 +130,11 @@ end
 ## Stacks child sizes left-to-right inside a container (see `layout_hbox`).
 pub function hbox(container: Rect, padding: int, spacing: int, sizes: Size[]) -> Rect[]
     return layout_hbox(container, padding, spacing, sizes)
+end
+
+## Arranges children in a uniform grid (see `layout_grid`).
+pub function grid(container: Rect, padding: int, spacing: int, cols: int, cell_h: int, count: int) -> Rect[]
+    return layout_grid(container, padding, spacing, cols, cell_h, count)
 end
 
 ## Native C FFI helper (bundled engine smoke test).

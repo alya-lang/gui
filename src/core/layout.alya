@@ -47,3 +47,33 @@ pub function layout_hbox(container: Rect, padding: int, spacing: int, sizes: Siz
     end
     return out
 end
+
+## Arranges children in a uniform `cols`-column grid (row-major order).
+##
+## Cell size derives from the inner width; every row is `cell_h` tall.
+## Returns one cell rect per child in input order (`[]` for empty input
+## or `cols <= 0`).
+pub function layout_grid(container: Rect, padding: int, spacing: int, cols: int, cell_h: int, count: int) -> Rect[]
+    let out = []
+    if cols <= 0 or count <= 0 or cell_h <= 0
+        return out
+    end
+    let inner = layout_padding(container, padding)
+    let cell_w = (inner.w - spacing * (cols - 1)) / cols
+    if cell_w <= 0
+        return out
+    end
+    let i = 0
+    while i < count
+        let col = i % cols
+        let row = (i - col) / cols
+        out.push(Rect {
+            x: inner.x + col * (cell_w + spacing),
+            y: inner.y + row * (cell_h + spacing),
+            w: cell_w,
+            h: cell_h
+        })
+        i += 1
+    end
+    return out
+end
