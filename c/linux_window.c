@@ -5,6 +5,7 @@
 // every public `alya_gui_window_*` symbol is defined exactly once.
 
 #include "linux_window.h"
+#include "gpu_contract.h"
 
 #include <errno.h>
 #include <fcntl.h>

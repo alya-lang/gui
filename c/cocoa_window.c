@@ -6,6 +6,7 @@
 // coordinates below are in backing pixels as reported by the view.
 
 #include "cocoa_window.h"
+#include "gpu_contract.h"
 
 #include <stdlib.h>
 #include <string.h>
