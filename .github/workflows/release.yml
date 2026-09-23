@@ -64,7 +64,10 @@ jobs:
           cp -r src "$STAGE/"
           if [ -d c ]; then cp -r c "$STAGE/"; fi
           if [ -d examples ]; then cp -r examples "$STAGE/"; fi
-          tar -czf alya-pkg.tar.gz -C pkg-stage "${REPO}-${TAG}"
+          # Reproducible bytes: sorted entries, fixed mtimes/owners, and
+          # `gzip -n` (no embedded filename/timestamp) so identical commits
+          # always produce identical archives.
+          tar --sort-name --owner=0 --group=0 --mtime='UTC 2020-01-01' -cf - -C pkg-stage "${REPO}-${TAG}" | gzip -n > alya-pkg.tar.gz
           sha256sum alya-pkg.tar.gz > alya-pkg.tar.gz.sha256
           ls -la alya-pkg.tar.gz alya-pkg.tar.gz.sha256
 
