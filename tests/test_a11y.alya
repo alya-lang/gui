@@ -43,6 +43,22 @@ function main()
     runner_assert_eq(r, ev.kind, pkg::GuiEventKind.ImeUpdate, "ime kind round-trips")
     runner_assert_str_eq(r, ev.text, "nihon", "composition text round-trips")
 
+    # 6. Accessible tree export skips invisible subtrees
+    let root = pkg::widget("box", "dlg")
+    pkg::widget_set_rect(root, pkg::rect(0, 0, 200, 200))
+    let okb = pkg::button("ok", "Confirm")
+    pkg::widget_set_rect(okb, pkg::rect(10, 10, 80, 30))
+    let hid = pkg::label("secret", "x")
+    pkg::widget_set_visible(hid, 0)
+    pkg::widget_add_child(root, okb)
+    pkg::widget_add_child(root, hid)
+    let tree = pkg::a11y_export(root)
+    runner_assert_eq(r, len(tree), 2, "export has root + visible child")
+    runner_assert_str_eq(r, tree[0]["id"], "dlg", "root record id")
+    runner_assert_eq(r, tree[1]["role"], 2, "button role in record")
+    runner_assert_str_eq(r, tree[1]["label"], "Confirm", "button label in record")
+    runner_assert_eq(r, tree[1]["x"], 10, "button x in record")
+
     let failed = runner_summary(r)
     if failed > 0
         exit(1)

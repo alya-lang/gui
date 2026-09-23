@@ -12,6 +12,8 @@ import "./core/events.alya"
 import "./core/state.alya"
 import "./core/layout.alya"
 import "./core/raster.alya"
+import "./canvas/context.alya"
+import "./canvas/surface.alya"
 import "./widgets/node.alya"
 import "./widgets/controls.alya"
 import "./widgets/containers.alya"
@@ -233,6 +235,71 @@ end
 ## Exports a canvas as PPM text (see `image_to_ppm`).
 pub function canvas_ppm(img: Image) -> string
     return image_to_ppm(img)
+end
+
+## Creates a drawing context over a solid canvas (see `drawctx_new`).
+pub function drawctx(w: int, h: int, bg: int = 0) -> DrawContext
+    return drawctx_new(w, h, bg)
+end
+
+## Fills a context canvas (see `ctx_clear`).
+pub function ctxclear(ctx: DrawContext, color: int) -> int
+    return ctx_clear(ctx, color)
+end
+
+## Sets context stroke (see `ctx_set_stroke`).
+pub function ctxstroke(ctx: DrawContext, color: Color, w: int = 1) -> int
+    return ctx_set_stroke(ctx, color, w)
+end
+
+## Sets context fill (see `ctx_set_fill`).
+pub function ctxfill(ctx: DrawContext, color: Color) -> int
+    return ctx_set_fill(ctx, color)
+end
+
+## Strokes a line on a context (see `ctx_line`).
+pub function ctxline(ctx: DrawContext, x0: int, y0: int, x1: int, y1: int) -> int
+    return ctx_line(ctx, x0, y0, x1, y1)
+end
+
+## Strokes a rectangle on a context (see `ctx_rect`).
+pub function ctxrect(ctx: DrawContext, x: int, y: int, w: int, h: int) -> int
+    return ctx_rect(ctx, x, y, w, h)
+end
+
+## Fills a rectangle on a context (see `ctx_fill_rect`).
+pub function ctxfillrect(ctx: DrawContext, x: int, y: int, w: int, h: int) -> int
+    return ctx_fill_rect(ctx, x, y, w, h)
+end
+
+## Strokes a circle on a context (see `ctx_circle`).
+pub function ctxcircle(ctx: DrawContext, cx: int, cy: int, radius: int) -> int
+    return ctx_circle(ctx, cx, cy, radius)
+end
+
+## Exports a context canvas as PPM (see `ctx_ppm`).
+pub function ctxppm(ctx: DrawContext) -> string
+    return ctx_ppm(ctx)
+end
+
+## Creates a drawable surface (see `surface_new`).
+pub function surface(w: int, h: int, bg: int = 0) -> DrawSurface
+    return surface_new(w, h, bg)
+end
+
+## Returns a surface drawing context (see `surface_ctx`).
+pub function surface_draw(s: DrawSurface)
+    return surface_ctx(s)
+end
+
+## Presents a surface (see `surface_present`).
+pub function surface_show(s: DrawSurface) -> int
+    return surface_present(s)
+end
+
+## Rebuilds a surface at a new size (see `surface_resize`).
+pub function surface_reshape(s: DrawSurface, w: int, h: int, bg: int = 0) -> int
+    return surface_resize(s, w, h, bg)
 end
 
 ## Native C FFI helper (bundled engine smoke test).

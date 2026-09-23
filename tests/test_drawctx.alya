@@ -1,0 +1,47 @@
+## DrawContext tests for gui
+## Part of the Alya Language package ecosystem (https://github.com/alya-lang)
+
+import "std/test"
+import "../src/lib.alya" as pkg
+
+function main()
+    test_suite("gui DrawContext Tests")
+    let r = runner_new()
+
+    let ctx = pkg::drawctx(20, 10, 0)
+    runner_assert_eq(r, pkg::ctxclear(ctx, 7), 200, "clear paints all")
+
+    runner_assert_eq(r, pkg::ctxstroke(ctx, pkg::rgb(255, 0, 0), 0), 1, "stroke returns 1")
+    runner_assert_eq(r, pkg::ctxline(ctx, 0, 0, 19, 0), 20, "top line paints 20")
+    runner_assert_eq(r, pkg::ctx_px(ctx, 5, 0), 16711680, "line pixel red")
+
+    runner_assert_eq(r, pkg::ctxfill(ctx, pkg::rgb(0, 255, 0)), 1, "fill returns 1")
+    runner_assert_eq(r, pkg::ctxfillrect(ctx, 2, 2, 4, 3), 12, "fill rect paints 12")
+    runner_assert_eq(r, pkg::ctx_px(ctx, 3, 3), 65280, "fill pixel green")
+
+    runner_assert_eq(r, pkg::ctxrect(ctx, 0, 0, 20, 10), 60, "rect outline paints 60")
+    runner_assert_eq(r, pkg::ctxcircle(ctx, 10, 5, 4) > 0, 1, "circle paints")
+
+    let ppm = pkg::ctxppm(ctx)
+    runner_assert(r, len(ppm) > 20, "ppm non-empty")
+
+    runner_assert_eq(r, pkg::ctxclear(null, 1), 0, "clear null safe")
+    runner_assert_eq(r, pkg::ctxline(null, 0, 0, 1, 1), 0, "line null safe")
+    runner_assert_eq(r, pkg::ctx_px(null, 0, 0), -1, "px null safe")
+
+    # Surface lifecycle over the same primitives
+    let s = pkg::surface(16, 8, 0)
+    let sc: DrawContext = pkg::surface_draw(s)
+    runner_assert_eq(r, pkg::ctxfillrect(sc, 0, 0, 16, 8), 128, "surface paint fills")
+    runner_assert_eq(r, pkg::surface_show(s), 1, "present returns 1")
+    runner_assert_eq(r, pkg::surface_show(null), 0, "present null safe")
+    runner_assert_eq(r, pkg::surface_reshape(s, 4, 4, 9), 1, "reshape returns 1")
+    runner_assert_eq(r, pkg::ctx_px(pkg::surface_draw(s), 0, 0), 9, "reshaped buffer reset")
+
+    let failed = runner_summary(r)
+    if failed > 0
+        exit(1)
+    end
+end
+
+main()

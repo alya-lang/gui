@@ -170,6 +170,14 @@ main()
 | `canvas_rect/canvas_line/canvas_circle` | `pub function` | Clipped shapes, painted-count returns. |
 | `canvas_ppm(img)` | `pub function` | ASCII PPM export. |
 | `Image` | `pub struct` | Row-major 0xRRGGBB buffer (`w`, `h`, `pixels`). |
+| `drawctx(w, h, bg)` | `pub function` | Drawing context over a solid canvas. |
+| `ctxline/ctxrect/ctxfillrect/ctxcircle` | `pub function` | Stroke/fill primitives on a context. |
+| `ctxppm(ctx)` | `pub function` | Context canvas PPM export. |
+| `surface(w, h, bg)` | `pub function` | Drawable surface (software reference). |
+| `surface_draw/show/reshape` | `pub function` | Context access, present, rebuild. |
+| `DrawContext` | `pub struct` | Stroke/fill state plus pixel target. |
+| `DrawSurface` | `pub struct` | Surface dimensions plus owned context. |
+| `a11y_export(root)` | `pub function` | Screen-reader tree records (skips hidden). |
 | `widget_add_child(parent, child)` | `pub function` | Appends a child; returns child count. |
 | `widget_find(root, id)` | `pub function` | Depth-first lookup by id (null when missing). |
 | `widget_hit(root, x, y)` | `pub function` | Deepest visible node containing the point. |

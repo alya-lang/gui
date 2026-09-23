@@ -1,0 +1,128 @@
+## gui/canvas/context — unified 2D drawing context
+##
+## Part of the Alya Language package ecosystem (https://github.com/alya-lang).
+## Hardware-facing API with a software raster backend today; GPU surfaces
+## (Direct2D/Metal/EGL) bind the same calls in Phase 2. Fully headless-testable.
+
+import "../types.alya"
+import "../core/raster.alya"
+
+## 2D drawing context: stroke/fill state plus a pixel target.
+##
+## ### Fields
+## - `img`: Target pixel buffer.
+## - `stroke`: Current stroke color.
+## - `fill`: Current fill color.
+## - `stroke_w`: Stroke width in pixels (>= 1).
+pub struct DrawContext
+    img: Image,
+    stroke: Color,
+    fill: Color,
+    stroke_w: int
+end
+
+## Creates a context over a solid-color canvas.
+pub function drawctx_new(w: int, h: int, bg: int = 0) -> DrawContext
+    return DrawContext {
+        img: image_new(w, h, bg),
+        stroke: color_rgb(255, 255, 255),
+        fill: color_rgb(255, 255, 255),
+        stroke_w: 1
+    }
+end
+
+## Fills the whole canvas with `color`; returns painted count.
+pub function ctx_clear(ctx: DrawContext, color: int) -> int
+    if ctx is null
+        return 0
+    end
+    return image_fill(ctx.img, color)
+end
+
+## Sets the stroke color and width (floored at 1).
+pub function ctx_set_stroke(ctx: DrawContext, color: Color, w: int = 1) -> int
+    if ctx is null
+        return 0
+    end
+    ctx.stroke = color
+    if w < 1
+        ctx.stroke_w = 1
+    else
+        ctx.stroke_w = w
+    end
+    return 1
+end
+
+## Sets the fill color.
+pub function ctx_set_fill(ctx: DrawContext, color: Color) -> int
+    if ctx is null
+        return 0
+    end
+    ctx.fill = color
+    return 1
+end
+
+## Strokes a 1px line (width>1 draws parallel offsets); returns painted count.
+pub function ctx_line(ctx: DrawContext, x0: int, y0: int, x1: int, y1: int) -> int
+    if ctx is null
+        return 0
+    end
+    let n = image_line(ctx.img, x0, y0, x1, y1, color_to_int(ctx.stroke))
+    let w = 1
+    while w < ctx.stroke_w
+        n = n + image_line(ctx.img, x0, y0 + w, x1, y1 + w, color_to_int(ctx.stroke))
+        n = n + image_line(ctx.img, x0, y0 - w, x1, y1 - w, color_to_int(ctx.stroke))
+        w += 1
+    end
+    return n
+end
+
+## Strokes a rectangle outline; returns painted count.
+pub function ctx_rect(ctx: DrawContext, x: int, y: int, w: int, h: int) -> int
+    if ctx is null
+        return 0
+    end
+    let c = color_to_int(ctx.stroke)
+    let n = image_line(ctx.img, x, y, x + w - 1, y, c)
+    n = n + image_line(ctx.img, x, y + h - 1, x + w - 1, y + h - 1, c)
+    n = n + image_line(ctx.img, x, y, x, y + h - 1, c)
+    n = n + image_line(ctx.img, x + w - 1, y, x + w - 1, y + h - 1, c)
+    return n
+end
+
+## Fills a rectangle with the fill color; returns painted count.
+pub function ctx_fill_rect(ctx: DrawContext, x: int, y: int, w: int, h: int) -> int
+    if ctx is null
+        return 0
+    end
+    return image_rect(ctx.img, x, y, w, h, color_to_int(ctx.fill))
+end
+
+## Strokes a circle outline; returns painted count.
+pub function ctx_circle(ctx: DrawContext, cx: int, cy: int, radius: int) -> int
+    if ctx is null
+        return 0
+    end
+    return image_circle(ctx.img, cx, cy, radius, color_to_int(ctx.stroke))
+end
+
+## Exports the canvas as PPM text.
+pub function ctx_ppm(ctx: DrawContext) -> string
+    if ctx is null
+        return ""
+    end
+    return image_to_ppm(ctx.img)
+end
+
+## Reads a canvas pixel, or `-1` when out of bounds.
+pub function ctx_px(ctx: DrawContext, x: int, y: int) -> int
+    if ctx is null
+        return -1
+    end
+    return image_get_px(ctx.img, x, y)
+end
+
+# Packs a Color into 0xRRGGBB (alpha is render-target business).
+function color_to_int(c: Color) -> int
+    return c.r * 65536 + c.g * 256 + c.b
+end

@@ -163,6 +163,39 @@ pub function accessible_label(w: Widget) -> string
     return w.id
 end
 
+## Exports the visible widget sub-tree as screen-reader records.
+##
+## Each record is a map: `{id, role, label, x, y, w, h}`. Invisible
+## subtrees are skipped. Native backends (UIA/NSAccessibility/AT-SPI)
+## consume this shape; see `c/a11y_contract.h`.
+pub function a11y_export(root: Widget) -> array
+    let out = []
+    a11y_collect(root, out)
+    return out
+end
+
+# Depth-first accessible record collection.
+function a11y_collect(w: Widget, out: array) -> int
+    if w is null or w.visible == 0
+        return 0
+    end
+    out.push({
+        "id": w.id,
+        "role": accessible_role(w),
+        "label": accessible_label(w),
+        "x": w.rect.x,
+        "y": w.rect.y,
+        "w": w.rect.w,
+        "h": w.rect.h
+    })
+    let i = 0
+    while i < len(w.children)
+        a11y_collect(w.children[i], out)
+        i += 1
+    end
+    return len(out)
+end
+
 ## Moves/resizes the node in parent coordinates.
 pub function widget_set_rect(w: Widget, r: Rect) -> int
     if w is null

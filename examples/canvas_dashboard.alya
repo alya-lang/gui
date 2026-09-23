@@ -1,33 +1,33 @@
-## Canvas dashboard rendering to PPM (headless-safe, no window needed)
+## Canvas dashboard rendered through DrawContext to PPM (headless-safe)
 ## Part of the Alya Language package ecosystem (https://github.com/alya-lang)
 ##
-## Draws bar charts into an offscreen canvas and prints PPM to stdout.
+## Draws bar charts on a unified 2D context and prints PPM to stdout.
 ## On display machines the same scene targets a native DrawContext.
 
 import "../src/lib.alya" as pkg
 
-function draw_bars(img, values, base_y: int, bar_w: int, gap: int, color: int)
+function draw_bars(ctx, values, base_y: int, bar_w: int, gap: int, color)
+    pkg::ctxfill(ctx, color)
     let i = 0
     while i < len(values)
         let h = values[i]
         if h < 0
             h = 0
         end
-        pkg::canvas_rect(img, 10 + i * (bar_w + gap), base_y - h, bar_w, h, color)
+        pkg::ctxfillrect(ctx, 10 + i * (bar_w + gap), base_y - h, bar_w, h)
         i += 1
     end
 end
 
 function main()
-    let img = pkg::canvas(120, 60, 1579045)
-    # grid baseline + frame
-    pkg::canvas_rect(img, 0, 0, 120, 1, 3289650)
-    pkg::canvas_rect(img, 0, 59, 120, 1, 3289650)
-    # synthetic load bars
-    draw_bars(img, [10, 25, 40, 30, 50, 20], 55, 12, 4, 9014783)
-    # heading underline
-    pkg::canvas_line(img, 10, 5, 110, 5, 16711680)
-    say pkg::canvas_ppm(img)
+    let ctx = pkg::drawctx(120, 60, 1579045)
+    pkg::ctxfill(ctx, pkg::rgb(49, 50, 68))
+    pkg::ctxfillrect(ctx, 0, 0, 120, 1)
+    pkg::ctxfillrect(ctx, 0, 59, 120, 1)
+    draw_bars(ctx, [10, 25, 40, 30, 50, 20], 55, 12, 4, pkg::rgb(137, 180, 250))
+    pkg::ctxstroke(ctx, pkg::rgb(255, 0, 0), 1)
+    pkg::ctxline(ctx, 10, 5, 110, 5)
+    say pkg::ctxppm(ctx)
 end
 
 main()

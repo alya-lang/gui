@@ -1,0 +1,56 @@
+## gui/canvas/surface — drawable surface contract
+##
+## Part of the Alya Language package ecosystem (https://github.com/alya-lang).
+## A surface owns a pixel target plus its drawing context. The software
+## implementation below is the reference (and the `wl_shm` fallback); GPU
+## backends (Direct2D/Metal/EGL, see `c/gpu_contract.h`) implement present
+## natively while reusing this exact call shape.
+
+import "./context.alya"
+
+## Drawable surface: dimensions plus an owned drawing context.
+##
+## ### Fields
+## - `ctx`: Drawing context over the surface pixels.
+## - `w`: Surface width.
+## - `h`: Surface height.
+pub struct DrawSurface
+    ctx: DrawContext,
+    w: int,
+    h: int
+end
+
+## Creates a software surface with a solid background.
+pub function surface_new(w: int, h: int, bg: int = 0) -> DrawSurface
+    return DrawSurface { ctx: drawctx_new(w, h, bg), w: w, h: h }
+end
+
+## Returns the surface drawing context (null-safe passthrough).
+pub function surface_ctx(s: DrawSurface)
+    if s is null
+        return null
+    end
+    return s.ctx
+end
+
+## Presents the surface.
+##
+## Software path: no-op returning `1` (pixels are already in the buffer;
+## native backends upload + swap here).
+pub function surface_present(s: DrawSurface) -> int
+    if s is null
+        return 0
+    end
+    return 1
+end
+
+## Rebuilds the surface at a new size (content is reset to `bg`).
+pub function surface_resize(s: DrawSurface, w: int, h: int, bg: int = 0) -> int
+    if s is null
+        return 0
+    end
+    s.ctx = drawctx_new(w, h, bg)
+    s.w = w
+    s.h = h
+    return 1
+end
