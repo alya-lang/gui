@@ -1,0 +1,75 @@
+## gui/native/window — native window FFI (Windows backend, Phase 1)
+##
+## Part of the Alya Language package ecosystem (https://github.com/alya-lang).
+## Thin bindings over `c/win32_window.c`. Window handles are opaque pointers;
+## events arrive as small integers so no struct marshaling is needed.
+
+extern "C"
+    function alya_gui_window_create(title: str, width: i32, height: i32) -> ptr
+    function alya_gui_window_destroy(win: ptr) -> void
+    function alya_gui_window_show(win: ptr) -> void
+    function alya_gui_window_hide(win: ptr) -> void
+    function alya_gui_window_is_open(win: ptr) -> i32
+    function alya_gui_window_set_title(win: ptr, title: str) -> void
+    function alya_gui_window_set_size(win: ptr, width: i32, height: i32) -> void
+    function alya_gui_window_close(win: ptr) -> void
+    function alya_gui_window_poll_event(win: ptr) -> i32
+    function alya_gui_event_width() -> i32
+    function alya_gui_event_height() -> i32
+    function alya_gui_event_mouse_x() -> i32
+    function alya_gui_event_mouse_y() -> i32
+end
+
+## Opens a native window; returns null when creation fails.
+pub function native_window_open(title: string, width: int, height: int)
+    return alya_gui_window_create(title, width, height)
+end
+
+## Destroys a native window (null-safe).
+pub function native_window_close_handle(win) -> int
+    alya_gui_window_destroy(win)
+    return 1
+end
+
+## Shows a native window.
+pub function native_window_show(win) -> int
+    if win is null
+        return 0
+    end
+    alya_gui_window_show(win)
+    return 1
+end
+
+## Returns 1 while the native window is open.
+pub function native_window_is_open(win) -> int
+    if win is null
+        return 0
+    end
+    return alya_gui_window_is_open(win)
+end
+
+## Requests a graceful close (like the title-bar button).
+pub function native_window_request_close(win) -> int
+    if win is null
+        return 0
+    end
+    alya_gui_window_close(win)
+    return 1
+end
+
+## Resizes the native window client area.
+pub function native_window_resize(win, width: int, height: int) -> int
+    if win is null
+        return 0
+    end
+    alya_gui_window_set_size(win, width, height)
+    return 1
+end
+
+## Pumps once; returns the event kind (`0` = none, `1` = close, ...).
+pub function native_window_poll(win) -> int
+    if win is null
+        return 0
+    end
+    return alya_gui_window_poll_event(win)
+end

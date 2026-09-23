@@ -1,0 +1,53 @@
+## Rasterizer tests for gui
+## Part of the Alya Language package ecosystem (https://github.com/alya-lang)
+
+import "std/test"
+import "../src/lib.alya" as pkg
+
+function main()
+    test_suite("gui Raster Tests")
+    let r = runner_new()
+
+    # 1. Construction and solid fill
+    let img = pkg::canvas(4, 3, 0)
+    runner_assert_eq(r, pkg::image_get_px(img, 0, 0), 0, "fresh pixel")
+    runner_assert_eq(r, pkg::image_get_px(img, 9, 9), -1, "OOB reads -1")
+    runner_assert_eq(r, pkg::image_set_px(img, 9, 9, 7), 0, "OOB write clipped")
+    runner_assert_eq(r, pkg::canvas_fill(img, 5), 12, "fill paints all")
+    runner_assert_eq(r, pkg::image_get_px(img, 3, 2), 5, "fill value")
+
+    # 2. Clipped rectangle
+    let rc = pkg::canvas(5, 5, 0)
+    runner_assert_eq(r, pkg::canvas_rect(rc, 1, 1, 3, 2, 9), 6, "rect paints 6")
+    runner_assert_eq(r, pkg::image_get_px(rc, 1, 1), 9, "rect corner")
+    runner_assert_eq(r, pkg::image_get_px(rc, 0, 0), 0, "outside untouched")
+    runner_assert_eq(r, pkg::canvas_rect(rc, 3, 3, 10, 10, 7), 4, "clipped rect paints 4")
+
+    # 3. Diagonal line
+    let ln = pkg::canvas(5, 5, 0)
+    runner_assert_eq(r, pkg::canvas_line(ln, 0, 0, 4, 4, 3), 5, "diagonal paints 5")
+    runner_assert_eq(r, pkg::image_get_px(ln, 2, 2), 3, "diagonal middle")
+    runner_assert_eq(r, pkg::image_get_px(ln, 0, 4), 0, "off-diagonal empty")
+
+    # 4. Circle outline hits cardinal points
+    let ci = pkg::canvas(11, 11, 0)
+    runner_assert(r, pkg::canvas_circle(ci, 5, 5, 4, 8) > 0, "circle paints")
+    runner_assert_eq(r, pkg::image_get_px(ci, 9, 5), 8, "east point")
+    runner_assert_eq(r, pkg::image_get_px(ci, 5, 1), 8, "north point")
+    runner_assert_eq(r, pkg::image_get_px(ci, 5, 5), 0, "center empty")
+
+    # 5. PPM export shape
+    let tiny = pkg::canvas(2, 1, 0)
+    pkg::image_set_px(tiny, 0, 0, 16711680)
+    let ppm = pkg::canvas_ppm(tiny)
+    runner_assert(r, len(ppm) > 10, "ppm non-empty")
+    runner_assert_str_eq(r, substring(ppm, 0, 2), "P3", "ppm magic")
+    runner_assert(r, pkg::image_get_px(tiny, 1, 0) == 0, "second pixel black")
+
+    let failed = runner_summary(r)
+    if failed > 0
+        exit(1)
+    end
+end
+
+main()

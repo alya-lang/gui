@@ -11,6 +11,7 @@ import "./core/backend.alya"
 import "./core/events.alya"
 import "./core/state.alya"
 import "./core/layout.alya"
+import "./core/raster.alya"
 import "./widgets/node.alya"
 import "./widgets/controls.alya"
 import "./widgets/containers.alya"
@@ -202,6 +203,36 @@ end
 ## Arranges children in a uniform grid (see `layout_grid`).
 pub function grid(container: Rect, padding: int, spacing: int, cols: int, cell_h: int, count: int) -> Rect[]
     return layout_grid(container, padding, spacing, cols, cell_h, count)
+end
+
+## Creates a solid-color pixel canvas (see `image_new`).
+pub function canvas(w: int, h: int, color: int = 0) -> Image
+    return image_new(w, h, color)
+end
+
+## Fills a canvas (see `image_fill`).
+pub function canvas_fill(img: Image, color: int) -> int
+    return image_fill(img, color)
+end
+
+## Paints a clipped rectangle (see `image_rect`).
+pub function canvas_rect(img: Image, x: int, y: int, w: int, h: int, color: int) -> int
+    return image_rect(img, x, y, w, h, color)
+end
+
+## Draws a 1px line (see `image_line`).
+pub function canvas_line(img: Image, x0: int, y0: int, x1: int, y1: int, color: int) -> int
+    return image_line(img, x0, y0, x1, y1, color)
+end
+
+## Draws a 1px circle outline (see `image_circle`).
+pub function canvas_circle(img: Image, cx: int, cy: int, radius: int, color: int) -> int
+    return image_circle(img, cx, cy, radius, color)
+end
+
+## Exports a canvas as PPM text (see `image_to_ppm`).
+pub function canvas_ppm(img: Image) -> string
+    return image_to_ppm(img)
 end
 
 ## Native C FFI helper (bundled engine smoke test).

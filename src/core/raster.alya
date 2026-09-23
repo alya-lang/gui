@@ -1,0 +1,173 @@
+## gui/core/raster — software rasterizer (headless canvas)
+##
+## Part of the Alya Language package ecosystem (https://github.com/alya-lang).
+## CPU pixel buffer with shapes and PPM export. Serves three roles: the
+## `wl_shm` software-fallback path, golden-pixel tests for draw primitives,
+## and offline chart rendering. Fully covered by `alya test`.
+
+## Row-major 0xRRGGBB pixel buffer.
+##
+## ### Fields
+## - `w`: Width in pixels.
+## - `h`: Height in pixels.
+## - `pixels`: `w * h` integers, row-major.
+pub struct Image
+    w: int,
+    h: int,
+    pixels: array
+end
+
+## Creates a solid-color image (`0` dimensions yield an empty buffer).
+pub function image_new(w: int, h: int, color: int = 0) -> Image
+    let px = []
+    if w > 0 and h > 0
+        let i = 0
+        while i < w * h
+            px.push(color)
+            i += 1
+        end
+    end
+    return Image { w: w, h: h, pixels: px }
+end
+
+## Fills the whole image with `color`; returns painted count.
+pub function image_fill(img: Image, color: int) -> int
+    if img is null
+        return 0
+    end
+    let n = 0
+    let i = 0
+    while i < len(img.pixels)
+        img.pixels[i] = color
+        n += 1
+        i += 1
+    end
+    return n
+end
+
+## Writes one clipped pixel; returns `1` when inside, `0` when clipped.
+pub function image_set_px(img: Image, x: int, y: int, color: int) -> int
+    if img is null or x < 0 or y < 0 or x >= img.w or y >= img.h
+        return 0
+    end
+    img.pixels[y * img.w + x] = color
+    return 1
+end
+
+## Reads one pixel, or `-1` when out of bounds.
+pub function image_get_px(img: Image, x: int, y: int) -> int
+    if img is null or x < 0 or y < 0 or x >= img.w or y >= img.h
+        return -1
+    end
+    return img.pixels[y * img.w + x]
+end
+
+## Fills an axis-aligned rectangle (clipped); returns painted count.
+pub function image_rect(img: Image, x: int, y: int, w: int, h: int, color: int) -> int
+    if img is null
+        return 0
+    end
+    let n = 0
+    let yy = y
+    while yy < y + h
+        let xx = x
+        while xx < x + w
+            n = n + image_set_px(img, xx, yy, color)
+            xx += 1
+        end
+        yy += 1
+    end
+    return n
+end
+
+## Draws a 1px Bresenham line; returns painted count.
+pub function image_line(img: Image, x0: int, y0: int, x1: int, y1: int, color: int) -> int
+    if img is null
+        return 0
+    end
+    let n = 0
+    let dx = x1 - x0
+    if dx < 0
+        dx = 0 - dx
+    end
+    let dy = y1 - y0
+    if dy < 0
+        dy = 0 - dy
+    end
+    let sx = 1
+    if x0 > x1
+        sx = 0 - 1
+    end
+    let sy = 1
+    if y0 > y1
+        sy = 0 - 1
+    end
+    let err = dx - dy
+    let x = x0
+    let y = y0
+    while 1
+        n = n + image_set_px(img, x, y, color)
+        if x == x1 and y == y1
+            break
+        end
+        let e2 = err * 2
+        if e2 > 0 - dy
+            err = err - dy
+            x = x + sx
+        end
+        if e2 < dx
+            err = err + dx
+            y = y + sy
+        end
+    end
+    return n
+end
+
+## Draws a 1px midpoint circle outline; returns painted count.
+pub function image_circle(img: Image, cx: int, cy: int, radius: int, color: int) -> int
+    if img is null or radius < 0
+        return 0
+    end
+    let n = 0
+    let x = radius
+    let y = 0
+    let err = 0
+    while x >= y
+        n = n + image_set_px(img, cx + x, cy + y, color)
+        n = n + image_set_px(img, cx + y, cy + x, color)
+        n = n + image_set_px(img, cx - y, cy + x, color)
+        n = n + image_set_px(img, cx - x, cy + y, color)
+        n = n + image_set_px(img, cx - x, cy - y, color)
+        n = n + image_set_px(img, cx - y, cy - x, color)
+        n = n + image_set_px(img, cx + y, cy - x, color)
+        n = n + image_set_px(img, cx + x, cy - y, color)
+        y += 1
+        if err <= 0
+            err = err + 2 * y + 1
+        end
+        if err > 0
+            x -= 1
+            err = err - 2 * x - 1
+        end
+    end
+    return n
+end
+
+## Exports the image as ASCII PPM (P3) text.
+pub function image_to_ppm(img: Image) -> string
+    if img is null
+        return ""
+    end
+    let out = "P3\n" + str(img.w) + " " + str(img.h) + "\n255\n"
+    let y = 0
+    while y < img.h
+        let x = 0
+        while x < img.w
+            let c = img.pixels[y * img.w + x]
+            out = out + str((c / 65536) % 256) + " " + str((c / 256) % 256) + " " + str(c % 256) + "\n"
+            x += 1
+        end
+        y += 1
+    end
+    return out
+end

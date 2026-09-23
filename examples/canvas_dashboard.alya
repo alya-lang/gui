@@ -1,0 +1,33 @@
+## Canvas dashboard rendering to PPM (headless-safe, no window needed)
+## Part of the Alya Language package ecosystem (https://github.com/alya-lang)
+##
+## Draws bar charts into an offscreen canvas and prints PPM to stdout.
+## On display machines the same scene targets a native DrawContext.
+
+import "../src/lib.alya" as pkg
+
+function draw_bars(img, values, base_y: int, bar_w: int, gap: int, color: int)
+    let i = 0
+    while i < len(values)
+        let h = values[i]
+        if h < 0
+            h = 0
+        end
+        pkg::canvas_rect(img, 10 + i * (bar_w + gap), base_y - h, bar_w, h, color)
+        i += 1
+    end
+end
+
+function main()
+    let img = pkg::canvas(120, 60, 1579045)
+    # grid baseline + frame
+    pkg::canvas_rect(img, 0, 0, 120, 1, 3289650)
+    pkg::canvas_rect(img, 0, 59, 120, 1, 3289650)
+    # synthetic load bars
+    draw_bars(img, [10, 25, 40, 30, 50, 20], 55, 12, 4, 9014783)
+    # heading underline
+    pkg::canvas_line(img, 10, 5, 110, 5, 16711680)
+    say pkg::canvas_ppm(img)
+end
+
+main()

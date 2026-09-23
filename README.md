@@ -30,17 +30,25 @@ gui/
 ├── .gitignore              # Ecosystem standard ignore filters
 ├── .vscode/                # VS Code workspace settings, DAP launch configurations & tasks
 ├── alya.toml               # Package manifest with dependencies and optional [build]
-├── c/                      # (Optional) Native C sources for zero-dependency FFI packages
+├── c/                      # Native backends (per-OS sources in alya.toml)
+│   ├── win32_window.c      # Windows: Win32 message pump + events
+│   ├── cocoa_window.c      # macOS: pure-C Cocoa via objc_msgSend (no ObjC syntax)
+│   ├── wayland_window.c    # Linux: raw Wayland wire protocol + shm buffer
+│   └── x11_window.c        # Linux fallback: Xlib client
 ├── src/
 │   ├── lib.alya            # Public API facade (pub exports, re-exports & pipeline runners)
 │   ├── types.alya          # Data models, pub enums, pub structs, and struct methods
 │   ├── ffi.alya            # (Optional) Native extern "C" declarations
+│   ├── native/             # Platform window FFI (one API, per-OS C backends)
+│   │   └── window.alya     # native_window_open/show/close/poll/is_open/resize
 │   └── core/               # Subdirectory module hierarchy
 │       ├── geometry.alya   # Headless rect math (overlap, union, inset)
 │       ├── backend.alya    # Host backend detection (windows/macos/wayland/x11)
 │       └── events.alya     # Portable FIFO GUI event queue
 ├── examples/
 │   └── demo.alya           # Comprehensive runnable walkthrough of all package capabilities
+│   ├── hello_gui.alya      # Minimal counter window (needs a display, skips headless)
+│   └── canvas_dashboard.alya # Offscreen bar charts rendered to PPM (headless-safe)
 ├── tests/
 │   └── test_basic.alya     # Automated test suite with 100% feature coverage
 └── benches/
@@ -158,6 +166,10 @@ main()
 | `bind_text(sig, w)` | `pub function` | Syncs widget text to the payload; marks dirty. |
 | `widget_mark_dirty(w)` / `widget_clear_dirty(w)` / `widget_is_dirty(w)` | `pub function` | Redraw-flag lifecycle. |
 | `Signal` | `pub struct` | Observable (`value`, `version`, `watchers`, `bound`). |
+| `canvas(w, h, color)` | `pub function` | Solid pixel canvas (`Image`). |
+| `canvas_rect/canvas_line/canvas_circle` | `pub function` | Clipped shapes, painted-count returns. |
+| `canvas_ppm(img)` | `pub function` | ASCII PPM export. |
+| `Image` | `pub struct` | Row-major 0xRRGGBB buffer (`w`, `h`, `pixels`). |
 | `widget_add_child(parent, child)` | `pub function` | Appends a child; returns child count. |
 | `widget_find(root, id)` | `pub function` | Depth-first lookup by id (null when missing). |
 | `widget_hit(root, x, y)` | `pub function` | Deepest visible node containing the point. |

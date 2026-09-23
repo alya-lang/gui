@@ -14,6 +14,11 @@ keywords = ["alya", "alya-lang", "package", "gui", "c", "ffi"]
 
 [build]
 c-sources = ["c/gui.c"]
+c-sources-windows = ["c/win32_window.c"]
+c-sources-macos = ["c/cocoa_window.c"]
+c-sources-linux = ["c/wayland_window.c", "c/x11_window.c"]
+c-flags-macos = ["-framework", "Cocoa", "-framework", "Foundation"]
+c-flags-linux = ["-lX11"]
 c-flags = ["-O2"]
 c-include-dirs = ["c"]
 links = "gui"
