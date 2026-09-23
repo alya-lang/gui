@@ -33,8 +33,7 @@ gui/
 ├── c/                      # Native backends (per-OS sources in alya.toml)
 │   ├── win32_window.c      # Windows: Win32 message pump + events
 │   ├── cocoa_window.c      # macOS: pure-C Cocoa via objc_msgSend (no ObjC syntax)
-│   ├── wayland_window.c    # Linux: raw Wayland wire protocol + shm buffer
-│   └── x11_window.c        # Linux fallback: Xlib client
+│   ├── linux_window.c      # Linux: Wayland first, Xlib fallback (single TU)
 ├── src/
 │   ├── lib.alya            # Public API facade (pub exports, re-exports & pipeline runners)
 │   ├── types.alya          # Data models, pub enums, pub structs, and struct methods
