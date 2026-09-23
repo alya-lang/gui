@@ -309,6 +309,55 @@ pub function native_event_text() -> string
     return native_window_event_text()
 end
 
+## Creates a GPU surface bound to a native window (see `native_gpu_create`).
+pub function gpu_create(win, width: int, height: int)
+    return native_gpu_create(win, width, height)
+end
+
+## Destroys a GPU surface (see `native_gpu_destroy`).
+pub function gpu_destroy(surf) -> int
+    return native_gpu_destroy(surf)
+end
+
+## Stages one XRGB pixel on a GPU surface (see `native_gpu_stage`).
+pub function gpu_stage(surf, index: int, color: int) -> int
+    return native_gpu_stage(surf, index, color)
+end
+
+## Presents the staged GPU buffer (see `native_gpu_present`).
+pub function gpu_present(surf) -> int
+    return native_gpu_present(surf)
+end
+
+## Rebuilds a GPU surface at a new size (see `native_gpu_resize`).
+pub function gpu_resize(surf, width: int, height: int) -> int
+    return native_gpu_resize(surf, width, height)
+end
+
+## Blits a software surface to a GPU surface: stages every pixel of the
+## surface image, then presents. The GPU surface must match the image
+## dimensions (extra pixels are ignored, missing ones stay zeroed).
+## Returns the staged pixel count, `0` when nothing was shown.
+pub function gpu_blit(s: DrawSurface, surf) -> int
+    if s is null or surf is null
+        return 0
+    end
+    if s.ctx is null or s.ctx.img is null
+        return 0
+    end
+    let px = s.ctx.img.pixels
+    let n = 0
+    let i = 0
+    while i < len(px)
+        n = n + native_gpu_stage(surf, i, px[i])
+        i += 1
+    end
+    if native_gpu_present(surf) == 0
+        return 0
+    end
+    return n
+end
+
 ## Stacks child sizes top-down inside a container (see `layout_vbox`).
 pub function vbox(container: Rect, padding: int, spacing: int, sizes: Size[]) -> Rect[]
     return layout_vbox(container, padding, spacing, sizes)

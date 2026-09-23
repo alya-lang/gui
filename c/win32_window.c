@@ -370,6 +370,13 @@ void alya_gui_window_close(alya_gui_window_t *win) {
     PostMessageW(win->hwnd, WM_CLOSE, 0, 0);
 }
 
+void *alya_gui_window_native_handle(alya_gui_window_t *win) {
+    if (win == NULL) {
+        return NULL;
+    }
+    return (void *)win->hwnd;
+}
+
 static alya_gui_event_t alya_gui_stashed = {0, 0, 0, 0, 0, 0};
 
 int32_t alya_gui_window_poll_event(alya_gui_window_t *win) {

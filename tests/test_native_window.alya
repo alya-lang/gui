@@ -63,7 +63,7 @@ function main()
     while dticks < 200
         pkg::native_drain(win, dq)
         while pkg::event_queue_len(dq) > 0
-            let dev = pkg::event_queue_poll(dq)
+            let dev: GuiEvent = pkg::event_queue_poll(dq)
             if dev.kind == 2 and dev.w == 420 and dev.h == 320
                 dfound = 1
             end
@@ -74,6 +74,20 @@ function main()
         dticks += 1
     end
     runner_assert_eq(r, dfound, 1, "drain maps RESIZE with size")
+
+    # 3c. GPU surface: create/stage/blit/present/resize/destroy live
+    let gs = pkg::gpu_create(win, 64, 48)
+    if gs is null
+        runner_assert(r, 1 == 1, "no GPU, skipped")
+    else
+        runner_assert_eq(r, pkg::gpu_stage(gs, 0, 16711680), 1, "gpu stage stored")
+        runner_assert_eq(r, pkg::gpu_stage(gs, 99999, 255), 0, "gpu stage OOB ignored")
+        let bs = pkg::surface(64, 48, 255)
+        runner_assert_eq(r, pkg::gpu_blit(bs, gs), 3072, "gpu blit staged all pixels")
+        runner_assert_eq(r, pkg::gpu_present(gs), 1, "gpu present shown")
+        runner_assert_eq(r, pkg::gpu_resize(gs, 32, 24), 1, "gpu resize ok")
+        runner_assert_eq(r, pkg::gpu_destroy(gs), 1, "gpu destroy ok")
+    end
 
     # 4. Graceful close -> CLOSE event -> not open
     runner_assert_eq(r, pkg::native_request_close(win), 1, "close requested")

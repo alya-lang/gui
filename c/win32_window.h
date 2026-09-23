@@ -66,6 +66,11 @@ void alya_gui_window_size(alya_gui_window_t *win, int32_t *w, int32_t *h);
 // No-op on NULL.
 void alya_gui_window_close(alya_gui_window_t *win);
 
+// Returns the HWND as an opaque pointer (NULL on NULL). Lets the
+// Direct2D surface backend (`c/d2d_surface.c`) bind its render target
+// without exposing Win32 types in the shared contract.
+void *alya_gui_window_native_handle(alya_gui_window_t *win);
+
 // Polls once and stashes the event for the scalar readers below.
 // Returns the event kind (0 when the queue is empty).
 int32_t alya_gui_window_poll_event(alya_gui_window_t *win);

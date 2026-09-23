@@ -1,0 +1,31 @@
+## GPU surface tests for gui (Phase 2)
+## Part of the Alya Language package ecosystem (https://github.com/alya-lang)
+##
+## Headless contract checks: null-safe wrappers, staging bounds, blit
+## plumbing. Live pixels reach the screen only on display runners
+## (see `test_native_window.alya` §3c on Windows).
+
+import "std/test"
+import "../src/lib.alya" as pkg
+
+function main()
+    test_suite("gui GPU Surface Tests")
+    let r = runner_new()
+
+    runner_assert(r, pkg::gpu_create(null, 64, 48) is null, "gpu create null win is null")
+    runner_assert_eq(r, pkg::gpu_destroy(null), 1, "gpu destroy null safe")
+    runner_assert_eq(r, pkg::gpu_stage(null, 0, 255), 0, "gpu stage null is 0")
+    runner_assert_eq(r, pkg::gpu_present(null), 0, "gpu present null is 0")
+    runner_assert_eq(r, pkg::gpu_resize(null, 8, 8), 0, "gpu resize null is 0")
+    runner_assert_eq(r, pkg::gpu_blit(null, null), 0, "gpu blit null is 0")
+
+    let s = pkg::surface(4, 3, 255)
+    runner_assert_eq(r, pkg::gpu_blit(s, null), 0, "gpu blit null surf is 0")
+
+    let failed = runner_summary(r)
+    if failed > 0
+        exit(1)
+    end
+end
+
+main()

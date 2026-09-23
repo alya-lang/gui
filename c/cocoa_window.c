@@ -17,7 +17,7 @@ typedef struct objc_object *id;
 typedef const struct objc_selector *SEL;
 typedef signed char BOOL;
 
-extern id objc_getClass(const char *name);
+extern Class objc_getClass(const char *name);
 extern SEL sel_registerName(const char *name);
 extern Class objc_allocateClassPair(Class superclass, const char *name,
                                     size_t extraBytes);
@@ -493,4 +493,178 @@ int32_t alya_gui_event_key(void) {
 
 const char *alya_gui_event_text(void) {
     return alya_gui_text_stash;
+}
+
+// --- GPU surface: CoreGraphics bitmap composited via CALayer ---
+//
+// Software-drawn XRGB stages straight into the bitmap context (zero copy);
+// `present` snapshots a CGImage and hands it to the layer, so composition
+// runs on the GPU. Guarded: non-Apple hosts get NULL stubs so this TU
+// still compiles everywhere (pure C, no ObjC syntax, no SDK headers).
+#ifdef __APPLE__
+#include <CoreGraphics/CoreGraphics.h>
+#endif
+
+struct alya_gpu_surface {
+    alya_gui_window_t *win;
+    uint32_t *staging;
+    int32_t width;
+    int32_t height;
+    void *cgctx;
+    void *cgdata;
+    void *layer;
+};
+
+alya_gpu_surface_t *alya_gpu_surface_create(void *native_win, int32_t width,
+                                            int32_t height) {
+#ifdef __APPLE__
+    alya_gui_window_t *win = (alya_gui_window_t *)native_win;
+    alya_gpu_surface_t *surf;
+    SEL sel;
+    id layer;
+    CGColorSpaceRef cs;
+    CGContextRef ctx;
+    void *data;
+    if (win == NULL || width <= 0 || height <= 0) {
+        return NULL;
+    }
+    sel = alya_sel("layer");
+    layer = ((id(*)(id, SEL))objc_msgSend)(win->view, sel);
+    if (layer == NULL) {
+        return NULL;
+    }
+    data = calloc((size_t)width * (size_t)height, 4);
+    if (data == NULL) {
+        return NULL;
+    }
+    cs = CGColorSpaceCreateDeviceRGB();
+    if (cs == NULL) {
+        free(data);
+        return NULL;
+    }
+    ctx = CGBitmapContextCreate(data, (size_t)width, (size_t)height, 8,
+                                (size_t)width * 4, cs,
+                                (uint32_t)kCGImageAlphaNoneSkipFirst |
+                                    (uint32_t)kCGBitmapByteOrder32Little);
+    CGColorSpaceRelease(cs);
+    if (ctx == NULL) {
+        free(data);
+        return NULL;
+    }
+    surf = (alya_gpu_surface_t *)calloc(1, sizeof(*surf));
+    if (surf == NULL) {
+        CGContextRelease(ctx);
+        free(data);
+        return NULL;
+    }
+    surf->win = win;
+    surf->staging = (uint32_t *)data;
+    surf->width = width;
+    surf->height = height;
+    surf->cgctx = (void *)ctx;
+    surf->cgdata = data;
+    surf->layer = (void *)layer;
+    return surf;
+#else
+    (void)native_win;
+    (void)width;
+    (void)height;
+    return NULL;
+#endif
+}
+
+void alya_gpu_surface_destroy(alya_gpu_surface_t *surf) {
+    if (surf == NULL) {
+        return;
+    }
+#ifdef __APPLE__
+    if (surf->cgctx != NULL) {
+        CGContextRelease((CGContextRef)surf->cgctx);
+    }
+    free(surf->cgdata);
+#endif
+    free(surf);
+}
+
+int32_t alya_gpu_surface_stage(alya_gpu_surface_t *surf, int32_t index,
+                               int32_t color) {
+    if (surf == NULL || surf->staging == NULL || index < 0) {
+        return 0;
+    }
+    if (index >= surf->width * surf->height) {
+        return 0;
+    }
+    surf->staging[index] = (uint32_t)(color & 0xFFFFFF);
+    return 1;
+}
+
+int32_t alya_gpu_surface_present(alya_gpu_surface_t *surf) {
+#ifdef __APPLE__
+    CGImageRef img;
+    SEL sel;
+    if (surf == NULL || surf->cgctx == NULL || surf->layer == NULL) {
+        return 0;
+    }
+    img = CGBitmapContextCreateImage((CGContextRef)surf->cgctx);
+    if (img == NULL) {
+        return 0;
+    }
+    sel = alya_sel("setContents:");
+    ((void(*)(id, SEL, id))objc_msgSend)((id)surf->layer, sel, (id)img);
+    CGImageRelease(img);
+    return 1;
+#else
+    (void)surf;
+    return 0;
+#endif
+}
+
+int32_t alya_gpu_surface_resize(alya_gpu_surface_t *surf, int32_t width,
+                                int32_t height) {
+#ifdef __APPLE__
+    CGColorSpaceRef cs;
+    CGContextRef ctx;
+    void *data;
+    if (surf == NULL || width <= 0 || height <= 0) {
+        return 0;
+    }
+    // Release the old bitmap in place (the layer pointer stays valid),
+    // then rebuild exactly like create().
+    if (surf->cgctx != NULL) {
+        CGContextRelease((CGContextRef)surf->cgctx);
+        surf->cgctx = NULL;
+    }
+    free(surf->cgdata);
+    surf->cgdata = NULL;
+    surf->staging = NULL;
+    data = calloc((size_t)width * (size_t)height, 4);
+    if (data == NULL) {
+        return 0;
+    }
+    cs = CGColorSpaceCreateDeviceRGB();
+    if (cs == NULL) {
+        free(data);
+        return 0;
+    }
+    ctx = CGBitmapContextCreate(data, (size_t)width, (size_t)height, 8,
+                                (size_t)width * 4, cs,
+                                (uint32_t)kCGImageAlphaNoneSkipFirst |
+                                    (uint32_t)kCGBitmapByteOrder32Little);
+    CGColorSpaceRelease(cs);
+    if (ctx == NULL) {
+        free(data);
+        return 0;
+    }
+    surf->staging = (uint32_t *)data;
+    surf->width = width;
+    surf->height = height;
+    surf->cgctx = (void *)ctx;
+    surf->cgdata = data;
+    return 1;
+#else
+    (void)surf;
+    (void)width;
+    (void)height;
+    return 0;
+#endif
 }

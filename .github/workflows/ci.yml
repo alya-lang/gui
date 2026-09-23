@@ -60,6 +60,24 @@ jobs:
         run: |
           alya test
 
+      - name: Verify GUI bundle build + binary size gate
+        shell: bash
+        run: |
+          alya build examples/hello_gui.alya --gui -o "$RUNNER_TEMP/hello_gui_check"
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            BIN="$RUNNER_TEMP/hello_gui_check.app/Contents/MacOS/hello_gui_check"
+            SIZE=$(stat -f%z "$BIN")
+          elif [ "$RUNNER_OS" = "Windows" ]; then
+            BIN="$RUNNER_TEMP/hello_gui_check/hello_gui_check.exe"
+            SIZE=$(stat -c%s "$BIN")
+            grep -q "PerMonitorV2" "$RUNNER_TEMP/hello_gui_check/hello_gui_check.exe.manifest"
+          else
+            BIN="$RUNNER_TEMP/hello_gui_check/hello_gui_check"
+            SIZE=$(stat -c%s "$BIN")
+          fi
+          echo "bundle binary bytes: $SIZE"
+          test "$SIZE" -lt 5242880
+
       - name: Run micro-benchmarks smoke test
         if: hashFiles('benches/bench_basic.alya') != ''
         run: |

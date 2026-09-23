@@ -25,6 +25,11 @@ extern "C"
     function alya_gui_event_mouse_y() -> i32
     function alya_gui_event_key() -> i32
     function alya_gui_event_text() -> str
+    function alya_gpu_surface_create(native_win: ptr, width: i32, height: i32) -> ptr
+    function alya_gpu_surface_destroy(surf: ptr) -> void
+    function alya_gpu_surface_stage(surf: ptr, index: i32, color: i32) -> i32
+    function alya_gpu_surface_present(surf: ptr) -> i32
+    function alya_gpu_surface_resize(surf: ptr, width: i32, height: i32) -> i32
 end
 
 ## Opens a native window; returns null when creation fails.
@@ -95,6 +100,46 @@ pub function native_window_event_text() -> string
         return ""
     end
     return t
+end
+
+## Creates a GPU surface bound to a native window (null when the window is
+## null or GPU init fails; the caller falls back to software rendering).
+pub function native_gpu_create(win, width: int, height: int)
+    if win is null
+        return null
+    end
+    return alya_gpu_surface_create(win, width, height)
+end
+
+## Destroys a GPU surface (null-safe).
+pub function native_gpu_destroy(surf) -> int
+    alya_gpu_surface_destroy(surf)
+    return 1
+end
+
+## Stages one XRGB pixel at flat `index` (`y * width + x`); returns `1`
+## when stored (`0` for null surfaces or out-of-range writes).
+pub function native_gpu_stage(surf, index: int, color: int) -> int
+    if surf is null
+        return 0
+    end
+    return alya_gpu_surface_stage(surf, index, color)
+end
+
+## Uploads the staged buffer and presents it; returns `1` on success.
+pub function native_gpu_present(surf) -> int
+    if surf is null
+        return 0
+    end
+    return alya_gpu_surface_present(surf)
+end
+
+## Rebuilds a GPU surface at a new size (content reset); returns `1`.
+pub function native_gpu_resize(surf, width: int, height: int) -> int
+    if surf is null
+        return 0
+    end
+    return alya_gpu_surface_resize(surf, width, height)
 end
 
 ## Drains all pending native events into `q` as `GuiEvent` records.

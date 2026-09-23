@@ -2,7 +2,6 @@
 ## Part of the Alya Language package ecosystem (https://github.com/alya-lang)
 
 import "../src/lib.alya" as pkg
-import "../src/native/window.alya" as nat
 
 function main()
     if pkg::backend() == "unknown"
@@ -10,12 +9,12 @@ function main()
         return
     end
 
-    let win = nat::native_window_open("Alya Counter", 320, 200)
+    let win = pkg::native_open("Alya Counter", 320, 200)
     if win is null
         say "hello_gui: window creation failed, skipping"
         return
     end
-    nat::native_window_show(win)
+    pkg::native_show(win)
 
     let count = pkg::signal(0)
     let label = pkg::label("count", "0")
@@ -23,15 +22,15 @@ function main()
 
     # Pump until the user closes the window (or 30s at ~60Hz).
     let ticks = 0
-    while nat::native_window_is_open(win) == 1 and ticks < 1800
-        let kind = nat::native_window_poll(win)
+    while pkg::native_is_open(win) == 1 and ticks < 1800
+        let kind = pkg::native_poll(win)
         if kind == pkg::GuiEventKind.Close
             break
         end
         ticks += 1
     end
     say "Final count: " + label.text
-    nat::native_window_close_handle(win)
+    pkg::native_destroy(win)
     say "Done!"
 end
 

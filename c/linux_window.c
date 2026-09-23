@@ -1142,3 +1142,264 @@ int32_t alya_gui_event_key(void) {
 const char *alya_gui_event_text(void) {
     return alya_gui_text_stash;
 }
+
+// --- GPU surface: Wayland shm upload, X11 XPutImage ---
+//
+// Staged XRGB reaches the screen without EGL: on Wayland through a
+// persistent shm pool (one buffer per present, the previous buffer is
+// destroyed), on X11 through a 24-bit TrueColor XImage. Both are real
+// presents to the bound window; EGL stays future work.
+
+struct alya_gpu_surface {
+    alya_gui_window_t *win;
+    uint32_t *staging;
+    int32_t width;
+    int32_t height;
+    int pool_fd;
+    uint8_t *pool_data;
+    size_t pool_size;
+    uint32_t wl_pool_id;
+    uint32_t wl_buffer;
+};
+
+alya_gpu_surface_t *alya_gpu_surface_create(void *native_win, int32_t width,
+                                            int32_t height) {
+    alya_gpu_surface_t *surf;
+    if (native_win == NULL || width <= 0 || height <= 0) {
+        return NULL;
+    }
+    surf = (alya_gpu_surface_t *)calloc(1, sizeof(*surf));
+    if (surf == NULL) {
+        return NULL;
+    }
+    surf->staging =
+        (uint32_t *)calloc((size_t)width * (size_t)height, sizeof(uint32_t));
+    if (surf->staging == NULL) {
+        free(surf);
+        return NULL;
+    }
+    surf->win = (alya_gui_window_t *)native_win;
+    surf->width = width;
+    surf->height = height;
+    surf->pool_fd = -1;
+    return surf;
+}
+
+void alya_gpu_surface_destroy(alya_gpu_surface_t *surf) {
+    if (surf == NULL) {
+        return;
+    }
+    if (surf->win != NULL &&
+        surf->win->active == ALYA_GUI_LINUX_WAYLAND) {
+        if (surf->wl_buffer != 0) {
+            wl_req(surf->win, surf->wl_buffer, 0, NULL, 0);
+            wl_dispatch(surf->win, 0);
+        }
+    }
+    if (surf->pool_data != NULL) {
+        munmap(surf->pool_data, surf->pool_size);
+    }
+    free(surf->staging);
+    free(surf);
+}
+
+int32_t alya_gpu_surface_stage(alya_gpu_surface_t *surf, int32_t index,
+                               int32_t color) {
+    if (surf == NULL || surf->staging == NULL || index < 0) {
+        return 0;
+    }
+    if (index >= surf->width * surf->height) {
+        return 0;
+    }
+    surf->staging[index] = (uint32_t)(color & 0xFFFFFF);
+    return 1;
+}
+
+// Ensures the shm pool holds at least `need` bytes (recreates + unmaps
+// the old one). Returns 0 on success.
+static int wl_surface_ensure_pool(alya_gui_window_t *win,
+                                  alya_gpu_surface_t *surf, size_t need) {
+    char shm_name[64];
+    int fd;
+    uint8_t *data;
+    uint8_t msg[16];
+    struct msghdr mh;
+    struct iovec iov;
+    char cmsg_buf[CMSG_SPACE(sizeof(int))];
+    struct cmsghdr *cmsg;
+    if (surf->pool_data != NULL && surf->pool_size >= need) {
+        return 0;
+    }
+    if (win->wl_shm_id == 0) {
+        return -1;
+    }
+    snprintf(shm_name, sizeof(shm_name), "/alya-gpu-%d-%p", (int)getpid(),
+             (void *)surf);
+    fd = shm_open(shm_name, O_RDWR | O_CREAT | O_EXCL, 0600);
+    if (fd < 0) {
+        return -1;
+    }
+    shm_unlink(shm_name);
+    if (ftruncate(fd, (off_t)need) < 0) {
+        close(fd);
+        return -1;
+    }
+    data = (uint8_t *)mmap(NULL, need, PROT_READ | PROT_WRITE, MAP_SHARED, fd,
+                           0);
+    if (data == MAP_FAILED) {
+        close(fd);
+        return -1;
+    }
+    if (surf->wl_buffer != 0) {
+        wl_req(win, surf->wl_buffer, 0, NULL, 0);
+        surf->wl_buffer = 0;
+    }
+    if (surf->pool_data != NULL) {
+        munmap(surf->pool_data, surf->pool_size);
+    }
+    surf->wl_pool_id = wl_new_id(win);
+    alya_wr32(msg, win->wl_shm_id);
+    alya_wr32(msg + 4, (16 << 16) | 0);
+    alya_wr32(msg + 8, surf->wl_pool_id);
+    alya_wr32(msg + 12, (uint32_t)need);
+    memset(&mh, 0, sizeof(mh));
+    iov.iov_base = msg;
+    iov.iov_len = sizeof(msg);
+    mh.msg_iov = &iov;
+    mh.msg_iovlen = 1;
+    mh.msg_control = cmsg_buf;
+    mh.msg_controllen = sizeof(cmsg_buf);
+    cmsg = CMSG_FIRSTHDR(&mh);
+    cmsg->cmsg_level = SOL_SOCKET;
+    cmsg->cmsg_type = SCM_RIGHTS;
+    cmsg->cmsg_len = CMSG_LEN(sizeof(int));
+    memcpy(CMSG_DATA(cmsg), &fd, sizeof(int));
+    mh.msg_controllen = cmsg->cmsg_len;
+    if (sendmsg(win->wl_fd, &mh, MSG_NOSIGNAL) < 0) {
+        munmap(data, need);
+        close(fd);
+        return -1;
+    }
+    close(fd);
+    surf->pool_fd = -1;
+    surf->pool_data = data;
+    surf->pool_size = need;
+    return 0;
+}
+
+// Uploads staging to a Wayland surface: pool copy + create_buffer +
+// attach + damage + commit. Returns 1 when the commit was sent.
+static int wl_surface_upload(alya_gui_window_t *win, alya_gpu_surface_t *surf) {
+    size_t stride;
+    size_t size;
+    uint32_t buf_id;
+    uint8_t bmsg[8 + 6 * 4];
+    uint32_t aargs[3];
+    uint32_t dargs[4];
+    if (win->wl_surface_id == 0) {
+        return 0;
+    }
+    stride = (size_t)surf->width * 4;
+    size = stride * (size_t)surf->height;
+    if (wl_surface_ensure_pool(win, surf, size) < 0) {
+        return 0;
+    }
+    memcpy(surf->pool_data, surf->staging, size);
+    // Retire the previously presented buffer before replacing it.
+    if (surf->wl_buffer != 0) {
+        wl_req(win, surf->wl_buffer, 0, NULL, 0);
+        surf->wl_buffer = 0;
+    }
+    // wl_shm_pool.create_buffer(new_id, offset, w, h, stride, XRGB8888=1).
+    buf_id = wl_new_id(win);
+    alya_wr32(bmsg, surf->wl_pool_id);
+    alya_wr32(bmsg + 4, ((8 + 6 * 4) << 16) | 0);
+    alya_wr32(bmsg + 8, buf_id);
+    alya_wr32(bmsg + 12, 0);
+    alya_wr32(bmsg + 16, (uint32_t)surf->width);
+    alya_wr32(bmsg + 20, (uint32_t)surf->height);
+    alya_wr32(bmsg + 24, (uint32_t)stride);
+    alya_wr32(bmsg + 28, 1);
+    if (wl_send(win, bmsg, sizeof(bmsg)) < 0) {
+        return 0;
+    }
+    surf->wl_buffer = buf_id;
+    // wl_surface.attach(buffer, 0, 0) + damage(full) + commit.
+    aargs[0] = buf_id;
+    aargs[1] = 0;
+    aargs[2] = 0;
+    if (wl_req(win, win->wl_surface_id, 1, aargs, 3) < 0) {
+        return 0;
+    }
+    dargs[0] = 0;
+    dargs[1] = 0;
+    dargs[2] = (uint32_t)surf->width;
+    dargs[3] = (uint32_t)surf->height;
+    wl_req(win, win->wl_surface_id, 2, dargs, 4);
+    wl_req(win, win->wl_surface_id, 6, NULL, 0);
+    return 1;
+}
+
+// Presents staging on X11 via a 24-bit TrueColor XImage (visual masks
+// queried, never assumed). Returns 1 when the image reached the window.
+static int x11_surface_upload(alya_gui_window_t *win,
+                              alya_gpu_surface_t *surf) {
+    Display *display = win->xdisplay;
+    int screen = DefaultScreen(display);
+    XVisualInfo vinfo;
+    XImage *img;
+    if (win->xwindow == 0) {
+        return 0;
+    }
+    if (!XMatchVisualInfo(display, screen, 24, TrueColor, &vinfo)) {
+        return 0;
+    }
+    img = XCreateImage(display, vinfo.visual, (unsigned)vinfo.depth, ZPixmap,
+                       0, (char *)surf->staging, (unsigned)surf->width,
+                       (unsigned)surf->height, 32,
+                       (int)((size_t)surf->width * 4));
+    if (img == NULL) {
+        return 0;
+    }
+    img->byte_order = LSBFirst;
+    img->red_mask = (unsigned long)vinfo.red_mask;
+    img->green_mask = (unsigned long)vinfo.green_mask;
+    img->blue_mask = (unsigned long)vinfo.blue_mask;
+    XPutImage(display, win->xwindow, DefaultGC(display, screen), img, 0, 0, 0,
+              0, (unsigned)surf->width, (unsigned)surf->height);
+    XFlush(display);
+    img->data = NULL;
+    XDestroyImage(img);
+    return 1;
+}
+
+int32_t alya_gpu_surface_present(alya_gpu_surface_t *surf) {
+    alya_gui_window_t *win;
+    if (surf == NULL || surf->win == NULL || surf->staging == NULL) {
+        return 0;
+    }
+    win = surf->win;
+    if (win->active == ALYA_GUI_LINUX_WAYLAND) {
+        return wl_surface_upload(win, surf);
+    }
+    return x11_surface_upload(win, surf);
+}
+
+int32_t alya_gpu_surface_resize(alya_gpu_surface_t *surf, int32_t width,
+                                int32_t height) {
+    uint32_t *staging;
+    if (surf == NULL || width <= 0 || height <= 0) {
+        return 0;
+    }
+    staging =
+        (uint32_t *)calloc((size_t)width * (size_t)height, sizeof(uint32_t));
+    if (staging == NULL) {
+        return 0;
+    }
+    free(surf->staging);
+    surf->staging = staging;
+    surf->width = width;
+    surf->height = height;
+    // The shm pool is recreated lazily on the next present.
+    return 1;
+}
