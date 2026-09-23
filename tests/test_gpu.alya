@@ -22,6 +22,9 @@ function main()
 
     let s = pkg::surface(4, 3, 255)
     runner_assert_eq(r, pkg::gpu_blit(s, null), 0, "gpu blit null surf is 0")
+    let rw = pkg::widget("box", "rw")
+    runner_assert_eq(r, pkg::render_tree(null, null, 64, 48), 0, "render null root is 0")
+    runner_assert_eq(r, pkg::render_tree(rw, null, 64, 48), 0, "render null surf is 0")
 
     let failed = runner_summary(r)
     if failed > 0

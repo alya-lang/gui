@@ -15,6 +15,7 @@ import "./core/layout.alya"
 import "./core/raster.alya"
 import "./canvas/context.alya"
 import "./canvas/surface.alya"
+import "./canvas/render.alya"
 import "./widgets/node.alya"
 import "./widgets/controls.alya"
 import "./widgets/containers.alya"
@@ -369,6 +370,11 @@ end
 ## Draws UTF-8 text on a GPU surface (see `native_gpu_text`).
 pub function gpu_text(surf, text: string, x: int, y: int, size_px: int, color: int) -> int
     return native_gpu_text(surf, text, x, y, size_px, color)
+end
+
+## Paints a widget tree and presents it on a GPU surface (see `render_present`).
+pub function render_tree(root: Widget, surf, w: int, h: int, focus: string = "") -> int
+    return render_present(root, surf, w, h, focus)
 end
 
 ## Blits a software surface to a GPU surface: stages every pixel of the

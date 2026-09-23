@@ -1,0 +1,232 @@
+## gui/canvas/render — retained tree painter (Phase 4 live half)
+##
+## Part of the Alya Language package ecosystem (https://github.com/alya-lang).
+## Paints the retained widget tree into a pixel buffer with the software
+## rasterizer, then uploads it through a GPU surface; text overlays go
+## through `gpu_text`. Dark theme, integer math, no window opened here.
+
+import "../types.alya"
+import "../core/raster.alya"
+import "../widgets/node.alya"
+import "../native/window.alya"
+
+# Theme (0xRRGGBB).
+function theme_bg() -> int
+    return 1579037
+end
+
+function theme_panel() -> int
+    return 1973802
+end
+
+function theme_ink() -> int
+    return 4474202
+end
+
+function theme_accent() -> int
+    return 9040890
+end
+
+function theme_text() -> int
+    return 13495372
+end
+
+function theme_muted() -> int
+    return 7107942
+end
+
+function theme_ok() -> int
+    return 10915225
+end
+
+# Strokes a 1px rectangle outline; returns painted count.
+function paint_border(img: Image, r: Rect, color: int) -> int
+    let n = 0
+    n = n + image_line(img, r.x, r.y, r.x + r.w - 1, r.y, color)
+    n = n + image_line(img, r.x, r.y + r.h - 1, r.x + r.w - 1, r.y + r.h - 1, color)
+    n = n + image_line(img, r.x, r.y, r.x, r.y + r.h - 1, color)
+    n = n + image_line(img, r.x + r.w - 1, r.y, r.x + r.w - 1, r.y + r.h - 1, color)
+    return n
+end
+
+# Paints one widget (no children); appends text overlays to `texts`.
+# Each overlay is a map: {"x", "y", "text"}.
+function paint_node(img: Image, w: Widget, texts: array) -> int
+    if w is null or w.visible == 0
+        return 0
+    end
+    let r = w.rect
+    if r.w <= 0 or r.h <= 0
+        return 0
+    end
+    if w.kind == "box" or w.kind == "stack"
+        image_rect(img, r.x, r.y, r.w, r.h, theme_panel())
+        return 1
+    end
+    if w.kind == "button"
+        image_rect(img, r.x, r.y, r.w, r.h, theme_ink())
+        paint_border(img, r, theme_muted())
+        texts.push({"x": r.x + 8, "y": r.y + r.h / 2 - 7, "text": w.text})
+        return 1
+    end
+    if w.kind == "label"
+        texts.push({"x": r.x, "y": r.y, "text": w.text})
+        return 1
+    end
+    if w.kind == "textinput" or w.kind == "textarea"
+        image_rect(img, r.x, r.y, r.w, r.h, 1118491)
+        paint_border(img, r, theme_muted())
+        texts.push({"x": r.x + 5, "y": r.y + 4, "text": w.text + "_"})
+        return 1
+    end
+    if w.kind == "checkbox"
+        image_rect(img, r.x, r.y, 14, 14, 1118491)
+        paint_border(img, rect_new(r.x, r.y, 14, 14), theme_muted())
+        if w.value == 1
+            image_line(img, r.x + 3, r.y + 7, r.x + 6, r.y + 11, theme_ok())
+            image_line(img, r.x + 6, r.y + 11, r.x + 12, r.y + 3, theme_ok())
+        end
+        texts.push({"x": r.x + 19, "y": r.y, "text": w.id})
+        return 1
+    end
+    if w.kind == "radio"
+        image_circle(img, r.x + 7, r.y + 7, 6, theme_muted())
+        if w.value == 1
+            image_rect(img, r.x + 5, r.y + 5, 5, 5, theme_accent())
+        end
+        texts.push({"x": r.x + 19, "y": r.y, "text": w.id})
+        return 1
+    end
+    if w.kind == "slider"
+        image_line(img, r.x, r.y + r.h / 2, r.x + r.w - 1, r.y + r.h / 2, theme_muted())
+        let kx = slider_knob_x(w)
+        image_rect(img, kx - 4, r.y + 1, 9, r.h - 2, theme_accent())
+        return 1
+    end
+    if w.kind == "progress"
+        image_rect(img, r.x, r.y, r.w, r.h, theme_ink())
+        image_rect(img, r.x, r.y, progress_fill_w(w), r.h, theme_ok())
+        return 1
+    end
+    if w.kind == "dropdown"
+        image_rect(img, r.x, r.y, r.w, r.h, 1118491)
+        paint_border(img, r, theme_muted())
+        texts.push({"x": r.x + 5, "y": r.y + 4, "text": dropdown_label(w)})
+        return 1
+    end
+    if w.kind == "listview"
+        image_rect(img, r.x, r.y, r.w, r.h, 1118491)
+        paint_border(img, r, theme_muted())
+        paint_rows(img, w)
+        return 1
+    end
+    return 0
+end
+
+# Slider knob x from value (clamped).
+function slider_knob_x(slider: Widget) -> int
+    let lo = slider.min_val
+    let hi = slider.max_val
+    if hi <= lo or slider.rect.w <= 0
+        return slider.rect.x
+    end
+    let v = slider.value
+    if v < lo
+        v = lo
+    end
+    if v > hi
+        v = hi
+    end
+    return slider.rect.x + (v - lo) * slider.rect.w / (hi - lo)
+end
+
+# Progress fill width from value (clamped).
+function progress_fill_w(w: Widget) -> int
+    let lo = w.min_val
+    let hi = w.max_val
+    if hi <= lo or w.rect.w <= 0
+        return 0
+    end
+    let v = w.value
+    if v < lo
+        v = lo
+    end
+    if v > hi
+        v = hi
+    end
+    return (v - lo) * w.rect.w / (hi - lo)
+end
+
+# Selected dropdown option text ("" when none).
+function dropdown_label(w: Widget) -> string
+    if w.options is null or len(w.options) == 0
+        return ""
+    end
+    let idx = w.value
+    if idx < 0 or idx >= len(w.options)
+        return ""
+    end
+    return w.options[idx]
+end
+
+# Paints listview rows (16px each, selected row highlighted).
+function paint_rows(img: Image, w: Widget) -> int
+    let n = 0
+    let i = 0
+    while i < len(w.options)
+        let ry = w.rect.y + 2 + i * 16
+        if ry + 13 >= w.rect.y + w.rect.h
+            break
+        end
+        if i == w.value
+            image_rect(img, w.rect.x + 2, ry, w.rect.w - 4, 14, theme_ink())
+        end
+        n += 1
+        i += 1
+    end
+    return n
+end
+
+# Depth-first paint (parents before children); draws the focus ring last.
+function paint_tree(img: Image, root: Widget, focus: string, texts: array) -> int
+    if root is null or root.visible == 0
+        return 0
+    end
+    paint_node(img, root, texts)
+    if root.id != "" and root.id == focus
+        paint_border(img, root.rect, theme_accent())
+    end
+    let i = 0
+    while i < len(root.children)
+        paint_tree(img, root.children[i], focus, texts)
+        i += 1
+    end
+    return 1
+end
+
+## Paints the tree into a `w`x`h` image and presents it on `surf`,
+## overlaying widget texts. `focus` draws the accent ring ("" = none).
+## Returns `1` when presented, `0` otherwise (null-safe).
+pub function render_present(root: Widget, surf, w: int, h: int, focus: string = "") -> int
+    if root is null or surf is null or w <= 0 or h <= 0
+        return 0
+    end
+    let img = image_new(w, h, theme_bg())
+    let texts = []
+    paint_tree(img, root, focus, texts)
+    let i = 0
+    while i < len(img.pixels)
+        native_gpu_stage(surf, i, img.pixels[i])
+        i += 1
+    end
+    if native_gpu_present(surf) == 0
+        return 0
+    end
+    let t = 0
+    while t < len(texts)
+        let item = texts[t]
+        native_gpu_text(surf, item["text"], item["x"], item["y"], 13, theme_text())
+        t += 1
+    end
+    return 1
+end
