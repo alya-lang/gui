@@ -50,6 +50,24 @@ jobs:
           (cd release-docs-md && zip -qr "../docs-md.zip" .)
           ls -la docs-html.zip docs-md.zip
 
+      - name: Build curated package archive (source + sha256)
+        shell: bash
+        run: |
+          REPO="${{ github.event.repository.name }}"
+          TAG="${{ github.ref_type == 'tag' && github.ref_name || inputs.tag }}"
+          # Allowlist staging: only install-time files enter the asset. The
+          # single top-level dir mirrors GitHub tag tarballs so installers can
+          # keep using `tar --strip-components 1`.
+          STAGE="pkg-stage/${REPO}-${TAG}"
+          mkdir -p "$STAGE"
+          cp alya.toml README.md LICENSE "$STAGE/"
+          cp -r src "$STAGE/"
+          if [ -d c ]; then cp -r c "$STAGE/"; fi
+          if [ -d examples ]; then cp -r examples "$STAGE/"; fi
+          tar -czf alya-pkg.tar.gz -C pkg-stage "${REPO}-${TAG}"
+          sha256sum alya-pkg.tar.gz > alya-pkg.tar.gz.sha256
+          ls -la alya-pkg.tar.gz alya-pkg.tar.gz.sha256
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
@@ -61,3 +79,5 @@ jobs:
           files: |
             docs-html.zip
             docs-md.zip
+            alya-pkg.tar.gz
+            alya-pkg.tar.gz.sha256
