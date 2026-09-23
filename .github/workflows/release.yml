@@ -35,6 +35,21 @@ jobs:
           TAG="${{ github.ref_type == 'tag' && github.ref_name || inputs.tag }}"
           python3 .github/scripts/generate_release_notes.py "$TAG"
 
+      - name: Set up Alya Compiler
+        uses: alya-lang/setup-alya@v1
+        with:
+          version: 'latest'
+
+      - name: Build documentation archives (HTML + Markdown)
+        shell: bash
+        run: |
+          TAG="${{ github.ref_type == 'tag' && github.ref_name || inputs.tag }}"
+          alya doc . -o release-docs-html --html
+          alya doc . -o release-docs-md --markdown
+          (cd release-docs-html && zip -qr "../docs-html.zip" .)
+          (cd release-docs-md && zip -qr "../docs-md.zip" .)
+          ls -la docs-html.zip docs-md.zip
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
@@ -43,3 +58,6 @@ jobs:
           body_path: RELEASE_NOTES.md
           draft: false
           prerelease: false
+          files: |
+            docs-html.zip
+            docs-md.zip
