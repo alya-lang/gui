@@ -142,6 +142,12 @@ main()
 | `dropdown(id, options, selected)` | `pub function` | Dropdown with clamped selected index. |
 | `listview(id, items)` | `pub function` | List view, initially unselected (`value = -1`). |
 | `radio_group_select(root, group, id)` | `pub function` | Group-exclusive radio selection. |
+| `signal(v)` | `pub function` | Observable value container. |
+| `signal_value(s)` / `signal_assign(s, v)` | `pub function` | Payload read / change-notifying write. |
+| `signal_observe(s, cb)` | `pub function` | Subscribes `fn(sig)`; returns watcher count. |
+| `bind_text(sig, w)` | `pub function` | Syncs widget text to the payload; marks dirty. |
+| `widget_mark_dirty(w)` / `widget_clear_dirty(w)` / `widget_is_dirty(w)` | `pub function` | Redraw-flag lifecycle. |
+| `Signal` | `pub struct` | Observable (`value`, `version`, `watchers`, `bound`). |
 | `widget_add_child(parent, child)` | `pub function` | Appends a child; returns child count. |
 | `widget_find(root, id)` | `pub function` | Depth-first lookup by id (null when missing). |
 | `widget_hit(root, x, y)` | `pub function` | Deepest visible node containing the point. |

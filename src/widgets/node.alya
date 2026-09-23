@@ -22,6 +22,7 @@ import "../core/geometry.alya"
 ## - `group`: Radio group name (radio buttons with the same group are exclusive).
 ## - `min_val`: Range minimum (slider, progress bar).
 ## - `max_val`: Range maximum (slider, progress bar).
+## - `dirty`: Redraw flag (`1` needs repaint, set by state bindings).
 ## - `on_click`: Click callback `fn(widget)` or null.
 ## - `on_change`: Change callback `fn(widget)` or null.
 pub struct Widget
@@ -34,8 +35,10 @@ pub struct Widget
     value: int,
     children: array,
     options: array,
+    group: string,
     min_val: int,
     max_val: int,
+    dirty: int,
     on_click,
     on_change
 end
@@ -55,6 +58,7 @@ pub function widget_new(kind: string, id: string = "") -> Widget
         group: "",
         min_val: 0,
         max_val: 100,
+        dirty: 0,
         on_click: null,
         on_change: null
     }

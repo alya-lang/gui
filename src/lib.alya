@@ -9,6 +9,7 @@ import "./types.alya"
 import "./core/geometry.alya"
 import "./core/backend.alya"
 import "./core/events.alya"
+import "./core/state.alya"
 import "./core/layout.alya"
 import "./widgets/node.alya"
 import "./widgets/controls.alya"
@@ -33,6 +34,31 @@ end
 ## Creates an empty GUI event queue.
 pub function event_queue() -> GuiEventQueue
     return event_queue_new()
+end
+
+## Creates a signal holding an initial payload.
+pub function signal(v) -> Signal
+    return signal_new(v)
+end
+
+## Returns a signal's current payload.
+pub function signal_value(s: Signal)
+    return signal_get(s)
+end
+
+## Assigns a signal payload, notifying on change (see `signal_set`).
+pub function signal_assign(s: Signal, v) -> int
+    return signal_set(s, v)
+end
+
+## Subscribes `fn(sig)` to a signal (see `signal_watch`).
+pub function signal_observe(s: Signal, cb) -> int
+    return signal_watch(s, cb)
+end
+
+## Binds a signal to a widget's text (see `bind_signal_text`).
+pub function bind_text(sig: Signal, w: Widget) -> int
+    return bind_signal_text(sig, w)
 end
 
 ## Builds an opaque RGB color.

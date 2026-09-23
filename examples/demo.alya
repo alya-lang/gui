@@ -45,6 +45,15 @@ function main()
     say "Clicked: " + str(pkg::click(root, 20, 20))
     say ""
 
+    say "--- Signals ---"
+    let sig = pkg::signal(0)
+    let counter = pkg::label("count", "?")
+    pkg::bind_text(sig, counter)
+    pkg::signal_assign(sig, 7)
+    say "Counter: " + counter.text
+    say "Dirty: " + str(pkg::widget_is_dirty(counter))
+    say ""
+
     say "--- Color ---"
     say pkg::rgba(137, 180, 250, 255).to_string()
     say ""

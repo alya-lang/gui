@@ -1,0 +1,154 @@
+## gui/core/state — reactive signals and dirty tracking
+##
+## Part of the Alya Language package ecosystem (https://github.com/alya-lang).
+## Observable values with watcher callbacks plus per-widget redraw flags.
+## This is the headless half of Phase 4 reactive state: native backends
+## will consult `dirty` flags for selective sub-tree repaints.
+##
+## Watcher convention: callbacks receive the signal (`fn(sig)`) and read
+## `sig.value` themselves, so one watcher can serve many bound widgets.
+
+import "../widgets/node.alya"
+
+## Observable value container.
+##
+## ### Fields
+## - `value`: Current payload (scalar usage: int/string).
+## - `version`: Incremented on every accepted change.
+## - `watchers`: Callback array (`fn(sig)` each).
+## - `bound`: Widgets refreshed by the text binding.
+## - `bound_active`: `1` once the text-binding updater is watching.
+pub struct Signal
+    value,
+    version: int,
+    watchers: array,
+    bound: array,
+    bound_active: int
+end
+
+## Creates a signal holding `initial` (version `0`, no watchers).
+pub function signal_new(initial) -> Signal
+    return Signal { value: initial, version: 0, watchers: [], bound: [], bound_active: 0 }
+end
+
+## Returns the current payload.
+pub function signal_get(s: Signal)
+    if s is null
+        return null
+    end
+    return s.value
+end
+
+## Returns the change counter.
+pub function signal_version(s: Signal) -> int
+    if s is null
+        return 0
+    end
+    return s.version
+end
+
+## Assigns a new payload; notifies watchers only on change.
+##
+## Returns `1` when watchers ran, `0` when the value is unchanged.
+pub function signal_set(s: Signal, v) -> int
+    if s is null
+        return 0
+    end
+    if v == s.value
+        return 0
+    end
+    s.value = v
+    s.version = s.version + 1
+    notify_watchers(s)
+    return 1
+end
+
+# Runs every watcher with the signal.
+function notify_watchers(s: Signal) -> int
+    let i = 0
+    while i < len(s.watchers)
+        let cb = s.watchers[i]
+        if cb is not null
+            cb(s)
+        end
+        i += 1
+    end
+    return len(s.watchers)
+end
+
+## Subscribes `fn(sig)`; returns the watcher count afterwards.
+pub function signal_watch(s: Signal, cb) -> int
+    if s is null or cb is null
+        return signal_watcher_count(s)
+    end
+    s.watchers.push(cb)
+    return signal_watcher_count(s)
+end
+
+## Returns the watcher count (`0` for null signals).
+pub function signal_watcher_count(s: Signal) -> int
+    if s is null
+        return 0
+    end
+    return len(s.watchers)
+end
+
+## Marks the node for repaint; returns `1`.
+pub function widget_mark_dirty(w: Widget) -> int
+    if w is null
+        return 0
+    end
+    w.dirty = 1
+    return 1
+end
+
+## Returns the redraw flag (`0`/`1`).
+pub function widget_is_dirty(w: Widget) -> int
+    if w is null
+        return 0
+    end
+    if w.dirty == 0
+        return 0
+    end
+    return 1
+end
+
+## Clears the redraw flag; returns `1`.
+pub function widget_clear_dirty(w: Widget) -> int
+    if w is null
+        return 0
+    end
+    w.dirty = 0
+    return 1
+end
+
+## Binds a signal to a widget's text: the widget shows the string form
+## of the payload and is marked dirty on every change.
+##
+## Multiple widgets may bind one signal; all refresh together.
+## Returns the watcher count afterwards.
+pub function bind_signal_text(sig: Signal, w: Widget) -> int
+    if sig is null or w is null
+        return 0
+    end
+    w.text = str(signal_get(sig))
+    widget_mark_dirty(w)
+    sig.bound.push(w)
+    if sig.bound_active == 0
+        sig.bound_active = 1
+        signal_watch(sig, bound_text_updater)
+    end
+    return signal_watcher_count(sig)
+end
+
+# Refreshes every widget bound to the firing signal.
+function bound_text_updater(s: Signal) -> int
+    let i = 0
+    while i < len(s.bound)
+        let w: Widget = s.bound[i]
+        w.text = str(s.value)
+        widget_mark_dirty(w)
+        i += 1
+    end
+    return len(s.bound)
+end
