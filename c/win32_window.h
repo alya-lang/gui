@@ -24,11 +24,12 @@ typedef struct alya_gui_window alya_gui_window_t;
 #define ALYA_GUI_EVENT_IME_UPDATE 12
 #define ALYA_GUI_EVENT_IME_END 13
 
-// Single pumped event: kind + client size + mouse position + key code.
-// `key` carries the platform key code for KEY_DOWN/KEY_UP (Win32 VK,
-// Cocoa keyCode, X11 KeySym, Wayland evdev) and the focus flag (1/0)
-// for FOCUS. Printable text arrives via TEXT_INPUT; the UTF-8 payload
-// lives in a static stash, see `alya_gui_event_text`.
+// Single pumped event: kind + client size + mouse position + key code +
+// UTF-8 text. `key` carries the platform key code for KEY_DOWN/KEY_UP and
+// the focus flag for FOCUS. `text` carries the payload for TEXT_INPUT and
+// IME_UPDATE/IME_END ("" otherwise). Text rides IN the event (not a side
+// stash) so interleaved pumps can never cross payloads.
+#define ALYA_GUI_TEXT_CAP 128
 typedef struct alya_gui_event {
     int32_t kind;
     int32_t width;
@@ -36,6 +37,7 @@ typedef struct alya_gui_event {
     int32_t mouse_x;
     int32_t mouse_y;
     int32_t key;
+    char text[ALYA_GUI_TEXT_CAP];
 } alya_gui_event_t;
 
 // Creates a top-level window (title is UTF-8). Returns NULL on failure.
@@ -90,8 +92,9 @@ int32_t alya_gui_event_height(void);
 int32_t alya_gui_event_mouse_x(void);
 int32_t alya_gui_event_mouse_y(void);
 int32_t alya_gui_event_key(void);
-// UTF-8 text of the stashed TEXT_INPUT event ("" when none). The pointer
-// stays valid until the next poll; copy it before pumping again.
+// UTF-8 text of the last pumped text-carrying event (`TEXT_INPUT`,
+// `IME_UPDATE`, `IME_END`; `""` otherwise). Alya strings may alias the
+// pointer, so polls hand out ring slots valid for 64 subsequent polls.
 const char *alya_gui_event_text(void);
 
 #endif

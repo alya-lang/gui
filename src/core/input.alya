@@ -51,6 +51,14 @@ pub function input_hovered(st: InputState) -> string
     return st.hover
 end
 
+## Returns the pressed widget id (`""` when none).
+pub function input_pressed(st: InputState) -> string
+    if st is null
+        return ""
+    end
+    return st.pressed
+end
+
 ## Returns 1 when `kind` can take keyboard focus.
 pub function input_is_focusable(kind: string) -> int
     if kind == "button" or kind == "textinput" or kind == "textarea"

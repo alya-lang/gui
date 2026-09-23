@@ -373,8 +373,8 @@ pub function gpu_text(surf, text: string, x: int, y: int, size_px: int, color: i
 end
 
 ## Paints a widget tree and presents it on a GPU surface (see `render_present`).
-pub function render_tree(root: Widget, surf, w: int, h: int, focus: string = "") -> int
-    return render_present(root, surf, w, h, focus)
+pub function render_tree(root: Widget, surf, w: int, h: int, focus: string = "", pressed: string = "") -> int
+    return render_present(root, surf, w, h, focus, pressed)
 end
 
 ## Blits a software surface to a GPU surface: stages every pixel of the

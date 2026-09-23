@@ -25,6 +25,8 @@ typedef struct alya_gui_window alya_gui_window_t;
 #define ALYA_GUI_EVENT_IME_UPDATE 12
 #define ALYA_GUI_EVENT_IME_END 13
 
+#define ALYA_GUI_TEXT_CAP 128
+
 typedef struct alya_gui_event {
     int32_t kind;
     int32_t width;
@@ -32,6 +34,7 @@ typedef struct alya_gui_event {
     int32_t mouse_x;
     int32_t mouse_y;
     int32_t key;
+    char text[ALYA_GUI_TEXT_CAP];
 } alya_gui_event_t;
 
 alya_gui_window_t *alya_gui_window_create(const char *title, int32_t width,

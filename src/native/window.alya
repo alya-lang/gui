@@ -182,7 +182,7 @@ pub function native_window_drain(win, q: GuiEventQueue) -> int
         if kind == 0
             break
         end
-        let text = ""
+        let text: string = ""
         if kind == GuiEventKind.TextInput
             text = native_window_event_text()
         end

@@ -78,9 +78,12 @@ struct alya_gui_window {
     alya_gui_event_t queue[ALYA_GUI_MAX_EVENTS];
 };
 
-static void alya_gui_push_event(alya_gui_window_t *win, int32_t kind,
-                                int32_t key) {
+// Queues an event carrying UTF-8 text. Text is stored IN the queued
+// slot (truncated), so interleaved pumps can never cross payloads.
+static void alya_gui_push_text(alya_gui_window_t *win, int32_t kind,
+                               int32_t key, const char *utf8) {
     int32_t next;
+    size_t n;
     if (win == NULL) {
         return;
     }
@@ -106,25 +109,22 @@ static void alya_gui_push_event(alya_gui_window_t *win, int32_t kind,
     win->queue[win->tail].mouse_x = win->mouse_x;
     win->queue[win->tail].mouse_y = win->mouse_y;
     win->queue[win->tail].key = key;
+    if (utf8 == NULL) {
+        win->queue[win->tail].text[0] = '\0';
+    } else {
+        n = strlen(utf8);
+        if (n > ALYA_GUI_TEXT_CAP - 1) {
+            n = ALYA_GUI_TEXT_CAP - 1;
+        }
+        memcpy(win->queue[win->tail].text, utf8, n);
+        win->queue[win->tail].text[n] = '\0';
+    }
     win->tail = next;
 }
 
-// UTF-8 stash for the latest TEXT_INPUT payload (truncated, NUL-terminated).
-#define ALYA_GUI_TEXT_STASH 128
-static char alya_gui_text_stash[ALYA_GUI_TEXT_STASH];
-
-static void alya_gui_set_text(const char *utf8) {
-    size_t n;
-    if (utf8 == NULL) {
-        alya_gui_text_stash[0] = '\0';
-        return;
-    }
-    n = strlen(utf8);
-    if (n > ALYA_GUI_TEXT_STASH - 1) {
-        n = ALYA_GUI_TEXT_STASH - 1;
-    }
-    memcpy(alya_gui_text_stash, utf8, n);
-    alya_gui_text_stash[n] = '\0';
+static void alya_gui_push_event(alya_gui_window_t *win, int32_t kind,
+                                int32_t key) {
+    alya_gui_push_text(win, kind, key, NULL);
 }
 
 static SEL alya_sel(const char *name) {
@@ -368,8 +368,8 @@ int32_t alya_gui_window_poll(alya_gui_window_t *win, alya_gui_event_t *out) {
                     if (utf8 != NULL && utf8[0] != '\0' &&
                         !((unsigned char)utf8[0] < 0x20 ||
                           (utf8[0] == 0x7F && utf8[1] == '\0'))) {
-                        alya_gui_set_text(utf8);
-                        alya_gui_push_event(win, ALYA_GUI_EVENT_TEXT_INPUT, 0);
+                        alya_gui_push_text(win, ALYA_GUI_EVENT_TEXT_INPUT, 0,
+                                           utf8);
                     }
                 } else {
                     alya_gui_push_event(win, ALYA_GUI_EVENT_KEY_UP,
@@ -455,6 +455,13 @@ void alya_gui_window_close(alya_gui_window_t *win) {
 
 static alya_gui_event_t alya_gui_stashed = {0, 0, 0, 0, 0, 0};
 
+// Ring of text slots: Alya strings may alias (not copy) the returned
+// pointer, so each poll hands out a fresh slot (see win32_window.c).
+#define ALYA_GUI_TEXT_SLOTS 64
+static char alya_gui_text_ring[ALYA_GUI_TEXT_SLOTS][ALYA_GUI_TEXT_CAP];
+static int alya_gui_text_next = 0;
+static int alya_gui_text_cur = 0;
+
 int32_t alya_gui_window_poll_event(alya_gui_window_t *win) {
     alya_gui_stashed.kind = 0;
     alya_gui_stashed.width = 0;
@@ -462,13 +469,21 @@ int32_t alya_gui_window_poll_event(alya_gui_window_t *win) {
     alya_gui_stashed.mouse_x = 0;
     alya_gui_stashed.mouse_y = 0;
     alya_gui_stashed.key = 0;
-    alya_gui_text_stash[0] = '\0';
+    alya_gui_stashed.text[0] = '\0';
     if (win == NULL) {
         return 0;
     }
     if (alya_gui_window_poll(win, &alya_gui_stashed) == 0) {
+        alya_gui_stashed.text[0] = '\0';
+        alya_gui_text_cur = alya_gui_text_next;
+        alya_gui_text_ring[alya_gui_text_cur][0] = '\0';
+        alya_gui_text_next = (alya_gui_text_next + 1) % ALYA_GUI_TEXT_SLOTS;
         return 0;
     }
+    alya_gui_text_cur = alya_gui_text_next;
+    memcpy(alya_gui_text_ring[alya_gui_text_cur], alya_gui_stashed.text,
+           ALYA_GUI_TEXT_CAP);
+    alya_gui_text_next = (alya_gui_text_next + 1) % ALYA_GUI_TEXT_SLOTS;
     return alya_gui_stashed.kind;
 }
 
@@ -493,7 +508,7 @@ int32_t alya_gui_event_key(void) {
 }
 
 const char *alya_gui_event_text(void) {
-    return alya_gui_text_stash;
+    return alya_gui_text_ring[alya_gui_text_cur];
 }
 
 // AppKit accessibility post (declared manually like the runtime API).

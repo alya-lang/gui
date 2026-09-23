@@ -50,8 +50,9 @@ function paint_border(img: Image, r: Rect, color: int) -> int
 end
 
 # Paints one widget (no children); appends text overlays to `texts`.
-# Each overlay is a map: {"x", "y", "text"}.
-function paint_node(img: Image, w: Widget, texts: array) -> int
+# Each overlay is a map: {"x", "y", "text"}. `pressed` paints the
+# pressed button in accent.
+function paint_node(img: Image, w: Widget, pressed: string, texts: array) -> int
     if w is null or w.visible == 0
         return 0
     end
@@ -64,7 +65,11 @@ function paint_node(img: Image, w: Widget, texts: array) -> int
         return 1
     end
     if w.kind == "button"
-        image_rect(img, r.x, r.y, r.w, r.h, theme_ink())
+        if w.id != "" and w.id == pressed
+            image_rect(img, r.x, r.y, r.w, r.h, theme_accent())
+        else
+            image_rect(img, r.x, r.y, r.w, r.h, theme_ink())
+        end
         paint_border(img, r, theme_muted())
         texts.push({"x": r.x + 8, "y": r.y + r.h / 2 - 7, "text": w.text})
         return 1
@@ -112,6 +117,7 @@ function paint_node(img: Image, w: Widget, texts: array) -> int
         image_rect(img, r.x, r.y, r.w, r.h, 1118491)
         paint_border(img, r, theme_muted())
         texts.push({"x": r.x + 5, "y": r.y + 4, "text": dropdown_label(w)})
+        texts.push({"x": r.x + r.w - 14, "y": r.y + 4, "text": "v"})
         return 1
     end
     if w.kind == "listview"
@@ -188,17 +194,17 @@ function paint_rows(img: Image, w: Widget) -> int
 end
 
 # Depth-first paint (parents before children); draws the focus ring last.
-function paint_tree(img: Image, root: Widget, focus: string, texts: array) -> int
+function paint_tree(img: Image, root: Widget, focus: string, pressed: string, texts: array) -> int
     if root is null or root.visible == 0
         return 0
     end
-    paint_node(img, root, texts)
+    paint_node(img, root, pressed, texts)
     if root.id != "" and root.id == focus
         paint_border(img, root.rect, theme_accent())
     end
     let i = 0
     while i < len(root.children)
-        paint_tree(img, root.children[i], focus, texts)
+        paint_tree(img, root.children[i], focus, pressed, texts)
         i += 1
     end
     return 1
@@ -207,13 +213,13 @@ end
 ## Paints the tree into a `w`x`h` image and presents it on `surf`,
 ## overlaying widget texts. `focus` draws the accent ring ("" = none).
 ## Returns `1` when presented, `0` otherwise (null-safe).
-pub function render_present(root: Widget, surf, w: int, h: int, focus: string = "") -> int
+pub function render_present(root: Widget, surf, w: int, h: int, focus: string = "", pressed: string = "") -> int
     if root is null or surf is null or w <= 0 or h <= 0
         return 0
     end
     let img = image_new(w, h, theme_bg())
     let texts = []
-    paint_tree(img, root, focus, texts)
+    paint_tree(img, root, focus, pressed, texts)
     let i = 0
     while i < len(img.pixels)
         native_gpu_stage(surf, i, img.pixels[i])
