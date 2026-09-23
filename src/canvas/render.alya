@@ -118,6 +118,9 @@ function paint_node(img: Image, w: Widget, pressed: string, texts: array) -> int
         paint_border(img, r, theme_muted())
         texts.push({"x": r.x + 5, "y": r.y + 4, "text": dropdown_label(w)})
         texts.push({"x": r.x + r.w - 14, "y": r.y + 4, "text": "v"})
+        if w.open == 1
+            paint_dropdown_list(img, w, texts)
+        end
         return 1
     end
     if w.kind == "listview"
@@ -173,6 +176,27 @@ function dropdown_label(w: Widget) -> string
         return ""
     end
     return w.options[idx]
+end
+
+# Paints an open dropdown's option rows under its box (18px each,
+# selected row highlighted); appends row texts.
+function paint_dropdown_list(img: Image, w: Widget, texts: array) -> int
+    let n = 0
+    let i = 0
+    while i < len(w.options)
+        let ry = w.rect.y + w.rect.h + i * 18
+        image_rect(img, w.rect.x, ry, w.rect.w, 18, 1118491)
+        if i == w.value
+            image_rect(img, w.rect.x + 2, ry + 2, w.rect.w - 4, 14, theme_ink())
+        end
+        texts.push({"x": w.rect.x + 5, "y": ry + 3, "text": w.options[i]})
+        n += 1
+        i += 1
+    end
+    if n > 0
+        paint_border(img, rect_new(w.rect.x, w.rect.y + w.rect.h, w.rect.w, n * 18), theme_muted())
+    end
+    return n
 end
 
 # Paints listview rows (16px each, selected row highlighted).

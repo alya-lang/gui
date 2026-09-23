@@ -198,12 +198,32 @@ end
 ## - Checkbox (enabled): toggles `value`, runs `on_change` when set, returns `1`.
 ## - Radio (enabled): selects within its group via `radio_group_select`, returns `1`.
 ## - Slider (enabled): sets `value` from the x position, runs `on_change` when set, returns `1`.
+## - Dropdown (enabled): toggles the option list; row clicks select.
+##   A click anywhere else first closes open lists, then dispatches.
 ## - Anything else, disabled nodes, or a miss: returns `0`.
 pub function dispatch_click(root: Widget, x: int, y: int) -> int
     let target = widget_hit(root, x, y)
     if target is null or target.enabled == 0
         return 0
     end
+    if target.kind == "dropdown"
+        close_other_dropdowns(root, target.id)
+        if target.open == 1
+            target.open = 0
+        else
+            target.open = 1
+        end
+        target.dirty = 1
+        return 1
+    end
+    // An open dropdown list floats above siblings: row clicks capture
+    // before underlying widgets activate (popup-modal behavior), and a
+    // click anywhere else closes the list first.
+    let picked = dropdown_list_apply(root, x, y)
+    if picked == 1
+        return 1
+    end
+    close_other_dropdowns(root, "")
     if target.kind == "button"
         if target.on_click is not null
             let cb = target.on_click
@@ -235,6 +255,101 @@ pub function dispatch_click(root: Widget, x: int, y: int) -> int
         return 1
     end
     return 0
+end
+
+# Row height of an open dropdown list.
+function dropdown_row_h() -> int
+    return 18
+end
+
+## Closes every open dropdown under `root` except `except_id` (`""` closes
+## all). Returns the closed count.
+pub function close_other_dropdowns(root: Widget, except_id: string) -> int
+    if root is null
+        return 0
+    end
+    let n = 0
+    if root.kind == "dropdown" and root.open == 1 and root.id != except_id
+        root.open = 0
+        root.dirty = 1
+        n = 1
+    end
+    let i = 0
+    while i < len(root.children)
+        n = n + close_other_dropdowns(root.children[i], except_id)
+        i += 1
+    end
+    return n
+end
+
+# Selects an open-dropdown row under (`x`, `y`): returns 1 when a row was
+# hit (selecting + closing + firing `on_change` on real changes).
+function dropdown_list_apply(node: Widget, x: int, y: int) -> int
+    if node is null or node.visible == 0
+        return 0
+    end
+    if node.kind == "dropdown" and node.open == 1 and node.enabled == 1
+        let idx = dropdown_row_at(node, x, y)
+        if idx >= 0
+            node.open = 0
+            node.dirty = 1
+            if idx != node.value
+                node.value = idx
+                if node.on_change is not null
+                    let cb = node.on_change
+                    cb(node)
+                end
+            end
+            return 1
+        end
+    end
+    let i = 0
+    while i < len(node.children)
+        if dropdown_list_apply(node.children[i], x, y) == 1
+            return 1
+        end
+        i += 1
+    end
+    return 0
+end
+
+# Option-row index under (`x`, `y`) for an open dropdown (`-1` on a miss).
+function dropdown_row_at(dd: Widget, x: int, y: int) -> int
+    let top = dd.rect.y + dd.rect.h
+    let idx = 0
+    if x < dd.rect.x or x >= dd.rect.x + dd.rect.w
+        return -1
+    end
+    if y < top
+        return -1
+    end
+    idx = (y - top) / dropdown_row_h()
+    if idx < 0 or idx >= len(dd.options)
+        return -1
+    end
+    return idx
+end
+
+## Returns the id of the open dropdown whose list rows contain (`x`, `y`)
+## (`""` when none). Lets presses land on popup rows without closing them.
+pub function dropdown_open_at(root: Widget, x: int, y: int) -> string
+    if root is null
+        return ""
+    end
+    if root.kind == "dropdown" and root.open == 1 and root.enabled == 1
+        if dropdown_row_at(root, x, y) >= 0
+            return root.id
+        end
+    end
+    let i = 0
+    while i < len(root.children)
+        let hit = dropdown_open_at(root.children[i], x, y)
+        if hit != ""
+            return hit
+        end
+        i += 1
+    end
+    return ""
 end
 
 # Maps an x coordinate onto the slider range (clamped).

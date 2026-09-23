@@ -208,12 +208,24 @@ pub function dispatch_mouse_down(st: InputState, root: Widget, x: int, y: int) -
         st.focus = ""
         return 0
     end
+    // A press on an open dropdown's rows targets the list, not the
+    // underlying widget: keep the list open for release-to-select.
+    let drop = dropdown_open_at(root, x, y)
+    if drop != ""
+        st.pressed = drop
+        st.focus = drop
+        return 1
+    end
     let hit = widget_hit(root, x, y)
     if hit is null or hit.enabled == 0
+        close_other_dropdowns(root, "")
         st.focus = ""
         return 0
     end
     st.pressed = hit.id
+    if hit.kind != "dropdown"
+        close_other_dropdowns(root, hit.id)
+    end
     if input_is_focusable(hit.kind) == 1
         st.focus = hit.id
     end
@@ -260,6 +272,14 @@ pub function dispatch_key(st: InputState, root: Widget, key: int) -> int
         return 0
     end
     if key == 27
+        if st.focus != ""
+            let fe = widget_find(root, st.focus)
+            if fe is not null and fe.kind == "dropdown" and fe.open == 1
+                fe.open = 0
+                fe.dirty = 1
+                return 1
+            end
+        end
         st.focus = ""
         st.composing = ""
         return 1
@@ -286,6 +306,19 @@ pub function dispatch_key(st: InputState, root: Widget, key: int) -> int
         return slider_key(target, key)
     end
     if target.kind == "dropdown" or target.kind == "listview"
+        if key == 13 or key == 32
+            if target.kind == "dropdown"
+                close_other_dropdowns(root, target.id)
+                if target.open == 1
+                    target.open = 0
+                else
+                    target.open = 1
+                end
+                target.dirty = 1
+                return 1
+            end
+            return 0
+        end
         return option_key(target, key)
     end
     if target.kind == "textinput" or target.kind == "textarea"

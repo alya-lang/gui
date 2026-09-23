@@ -23,6 +23,7 @@ import "../core/geometry.alya"
 ## - `min_val`: Range minimum (slider, progress bar).
 ## - `max_val`: Range maximum (slider, progress bar).
 ## - `dirty`: Redraw flag (`1` needs repaint, set by state bindings).
+## - `open`: Dropdown list open flag (`1` open, `0` closed).
 ## - `on_click`: Click callback `fn(widget)` or null.
 ## - `on_change`: Change callback `fn(widget)` or null.
 pub struct Widget
@@ -39,6 +40,7 @@ pub struct Widget
     min_val: int,
     max_val: int,
     dirty: int,
+    open: int,
     on_click,
     on_change
 end
@@ -59,6 +61,7 @@ pub function widget_new(kind: string, id: string = "") -> Widget
         min_val: 0,
         max_val: 100,
         dirty: 0,
+        open: 0,
         on_click: null,
         on_change: null
     }
