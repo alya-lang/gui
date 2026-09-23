@@ -23,6 +23,10 @@ function theme_ink() -> int
     return 4474202
 end
 
+function theme_ink_hover() -> int
+    return 5790576
+end
+
 function theme_accent() -> int
     return 9040890
 end
@@ -31,12 +35,20 @@ function theme_text() -> int
     return 13495372
 end
 
+function theme_dark_text() -> int
+    return 1118491
+end
+
 function theme_muted() -> int
     return 7107942
 end
 
 function theme_ok() -> int
     return 10915225
+end
+
+function theme_shadow() -> int
+    return 723730
 end
 
 # Strokes a 1px rectangle outline; returns painted count.
@@ -49,10 +61,22 @@ function paint_border(img: Image, r: Rect, color: int) -> int
     return n
 end
 
+# Fills a rounded box with a 1px border (two fills); returns painted count.
+function paint_framed(img: Image, x: int, y: int, w: int, h: int, r: int, fill: int, border: int) -> int
+    let n = image_rect_rounded(img, x, y, w, h, r, border)
+    n = n + image_rect_rounded(img, x + 1, y + 1, w - 2, h - 2, r, fill)
+    return n
+end
+
+# Drops a soft offset shadow; returns painted count.
+function paint_shadow(img: Image, x: int, y: int, w: int, h: int, r: int) -> int
+    return image_rect_rounded(img, x + 2, y + 3, w, h, r, theme_shadow())
+end
+
 # Paints one widget (no children); appends text overlays to `texts`.
-# Each overlay is a map: {"x", "y", "text"}. `pressed` paints the
-# pressed button in accent.
-function paint_node(img: Image, w: Widget, pressed: string, texts: array) -> int
+# Each overlay is a map: {"x", "y", "text", "color"}. `pressed`/`hover`
+# carry widget ids for state styling; disabled nodes render dimmed.
+function paint_node(img: Image, w: Widget, pressed: string, hover: string, texts: array) -> int
     if w is null or w.visible == 0
         return 0
     end
@@ -60,71 +84,135 @@ function paint_node(img: Image, w: Widget, pressed: string, texts: array) -> int
     if r.w <= 0 or r.h <= 0
         return 0
     end
+    let dim = 0
+    if w.enabled == 0
+        dim = 1
+    end
     if w.kind == "box" or w.kind == "stack"
         image_rect(img, r.x, r.y, r.w, r.h, theme_panel())
         return 1
     end
     if w.kind == "button"
-        if w.id != "" and w.id == pressed
-            image_rect(img, r.x, r.y, r.w, r.h, theme_accent())
+        let fill = theme_ink()
+        let tcol = theme_text()
+        if dim == 1
+            fill = theme_panel()
+            tcol = theme_muted()
         else
-            image_rect(img, r.x, r.y, r.w, r.h, theme_ink())
+            if w.id != "" and w.id == pressed
+                fill = theme_accent()
+                tcol = theme_dark_text()
+            else
+                if w.id != "" and w.id == hover
+                    fill = theme_ink_hover()
+                end
+            end
         end
-        paint_border(img, r, theme_muted())
-        texts.push({"x": r.x + 8, "y": r.y + r.h / 2 - 7, "text": w.text})
+        paint_shadow(img, r.x, r.y, r.w, r.h, 6)
+        paint_framed(img, r.x, r.y, r.w, r.h, 6, fill, theme_muted())
+        texts.push({"x": r.x + 10, "y": r.y + r.h / 2 - 7, "text": w.text, "color": tcol})
         return 1
     end
     if w.kind == "label"
-        texts.push({"x": r.x, "y": r.y, "text": w.text})
+        let lcol = theme_text()
+        if dim == 1
+            lcol = theme_muted()
+        end
+        texts.push({"x": r.x, "y": r.y, "text": w.text, "color": lcol})
         return 1
     end
     if w.kind == "textinput" or w.kind == "textarea"
-        image_rect(img, r.x, r.y, r.w, r.h, 1118491)
-        paint_border(img, r, theme_muted())
-        texts.push({"x": r.x + 5, "y": r.y + 4, "text": w.text + "_"})
+        let edge = theme_muted()
+        if dim == 0 and w.id != "" and w.id == hover
+            edge = theme_text()
+        end
+        paint_framed(img, r.x, r.y, r.w, r.h, 6, theme_dark_text(), edge)
+        let ncol = theme_text()
+        if dim == 1
+            ncol = theme_muted()
+        end
+        texts.push({"x": r.x + 8, "y": r.y + 5, "text": w.text + "_", "color": ncol})
         return 1
     end
     if w.kind == "checkbox"
-        image_rect(img, r.x, r.y, 14, 14, 1118491)
-        paint_border(img, rect_new(r.x, r.y, 14, 14), theme_muted())
-        if w.value == 1
-            image_line(img, r.x + 3, r.y + 7, r.x + 6, r.y + 11, theme_ok())
-            image_line(img, r.x + 6, r.y + 11, r.x + 12, r.y + 3, theme_ok())
+        let ecol = theme_muted()
+        if dim == 0 and w.id != "" and w.id == hover
+            ecol = theme_text()
         end
-        texts.push({"x": r.x + 19, "y": r.y, "text": w.id})
+        paint_framed(img, r.x, r.y + 2, 15, 15, 4, theme_dark_text(), ecol)
+        if w.value == 1
+            let ccol = theme_ok()
+            if dim == 1
+                ccol = theme_muted()
+            end
+            image_line(img, r.x + 4, r.y + 11, r.x + 7, r.y + 15, ccol)
+            image_line(img, r.x + 7, r.y + 15, r.x + 13, r.y + 7, ccol)
+        end
+        let bcol = theme_text()
+        if dim == 1
+            bcol = theme_muted()
+        end
+        texts.push({"x": r.x + 21, "y": r.y + 4, "text": w.id, "color": bcol})
         return 1
     end
     if w.kind == "radio"
-        image_circle(img, r.x + 7, r.y + 7, 6, theme_muted())
-        if w.value == 1
-            image_rect(img, r.x + 5, r.y + 5, 5, 5, theme_accent())
+        let ocol = theme_muted()
+        if dim == 0 and w.id != "" and w.id == hover
+            ocol = theme_text()
         end
-        texts.push({"x": r.x + 19, "y": r.y, "text": w.id})
+        image_circle(img, r.x + 8, r.y + 9, 6, ocol)
+        if w.value == 1
+            let dcol = theme_accent()
+            if dim == 1
+                dcol = theme_muted()
+            end
+            image_circle_filled(img, r.x + 8, r.y + 9, 3, dcol)
+        end
+        let ucol = theme_text()
+        if dim == 1
+            ucol = theme_muted()
+        end
+        texts.push({"x": r.x + 21, "y": r.y + 4, "text": w.id, "color": ucol})
         return 1
     end
     if w.kind == "slider"
-        image_line(img, r.x, r.y + r.h / 2, r.x + r.w - 1, r.y + r.h / 2, theme_muted())
+        let ty = r.y + r.h / 2 - 2
+        image_rect_rounded(img, r.x, ty, r.w, 5, 2, theme_ink())
+        image_rect_rounded(img, r.x, ty, slider_fill_w(w), 5, 2, theme_accent())
         let kx = slider_knob_x(w)
-        image_rect(img, kx - 4, r.y + 1, 9, r.h - 2, theme_accent())
+        let kcol = theme_text()
+        if dim == 1
+            kcol = theme_muted()
+        else
+            if w.id != "" and w.id == hover
+                kcol = theme_accent()
+            end
+        end
+        image_circle_filled(img, kx, r.y + r.h / 2, 8, theme_shadow())
+        image_circle_filled(img, kx, r.y + r.h / 2, 7, kcol)
         return 1
     end
     if w.kind == "progress"
-        image_rect(img, r.x, r.y, r.w, r.h, theme_ink())
-        image_rect(img, r.x, r.y, progress_fill_w(w), r.h, theme_ok())
+        paint_framed(img, r.x, r.y, r.w, r.h, 4, theme_ink(), theme_ink())
+        image_rect_rounded(img, r.x + 2, r.y + 2, progress_fill_w(w), r.h - 4, 3, theme_ok())
         return 1
     end
     if w.kind == "dropdown"
-        image_rect(img, r.x, r.y, r.w, r.h, 1118491)
-        paint_border(img, r, theme_muted())
-        texts.push({"x": r.x + 5, "y": r.y + 4, "text": dropdown_label(w)})
-        texts.push({"x": r.x + r.w - 14, "y": r.y + 4, "text": "v"})
+        let dcol = theme_text()
+        if dim == 1
+            dcol = theme_muted()
+        end
+        paint_shadow(img, r.x, r.y, r.w, r.h, 6)
+        paint_framed(img, r.x, r.y, r.w, r.h, 6, theme_dark_text(), theme_muted())
+        texts.push({"x": r.x + 8, "y": r.y + 5, "text": dropdown_label(w), "color": dcol})
+        texts.push({"x": r.x + r.w - 16, "y": r.y + 5, "text": "v", "color": theme_muted()})
         if w.open == 1
             paint_dropdown_list(img, w, texts)
         end
         return 1
     end
     if w.kind == "listview"
-        image_rect(img, r.x, r.y, r.w, r.h, 1118491)
+        image_rect(img, r.x, r.y, r.w, r.h, theme_dark_text())
         paint_border(img, r, theme_muted())
         paint_rows(img, w)
         return 1
@@ -147,6 +235,23 @@ function slider_knob_x(slider: Widget) -> int
         v = hi
     end
     return slider.rect.x + (v - lo) * slider.rect.w / (hi - lo)
+end
+
+# Slider fill width from value (clamped).
+function slider_fill_w(slider: Widget) -> int
+    let lo = slider.min_val
+    let hi = slider.max_val
+    if hi <= lo or slider.rect.w <= 0
+        return 0
+    end
+    let v = slider.value
+    if v < lo
+        v = lo
+    end
+    if v > hi
+        v = hi
+    end
+    return (v - lo) * slider.rect.w / (hi - lo)
 end
 
 # Progress fill width from value (clamped).
@@ -185,11 +290,11 @@ function paint_dropdown_list(img: Image, w: Widget, texts: array) -> int
     let i = 0
     while i < len(w.options)
         let ry = w.rect.y + w.rect.h + i * 18
-        image_rect(img, w.rect.x, ry, w.rect.w, 18, 1118491)
+        image_rect(img, w.rect.x, ry, w.rect.w, 18, theme_dark_text())
         if i == w.value
             image_rect(img, w.rect.x + 2, ry + 2, w.rect.w - 4, 14, theme_ink())
         end
-        texts.push({"x": w.rect.x + 5, "y": ry + 3, "text": w.options[i]})
+        texts.push({"x": w.rect.x + 8, "y": ry + 3, "text": w.options[i], "color": theme_text()})
         n += 1
         i += 1
     end
@@ -218,32 +323,33 @@ function paint_rows(img: Image, w: Widget) -> int
 end
 
 # Depth-first paint (parents before children); draws the focus ring last.
-function paint_tree(img: Image, root: Widget, focus: string, pressed: string, texts: array) -> int
+function paint_tree(img: Image, root: Widget, focus: string, pressed: string, hover: string, texts: array) -> int
     if root is null or root.visible == 0
         return 0
     end
-    paint_node(img, root, pressed, texts)
-    if root.id != "" and root.id == focus
+    paint_node(img, root, pressed, hover, texts)
+    if root.id != "" and root.id == focus and root.enabled == 1
         paint_border(img, root.rect, theme_accent())
     end
     let i = 0
     while i < len(root.children)
-        paint_tree(img, root.children[i], focus, pressed, texts)
+        paint_tree(img, root.children[i], focus, pressed, hover, texts)
         i += 1
     end
     return 1
 end
 
 ## Paints the tree into a `w`x`h` image and presents it on `surf`,
-## overlaying widget texts. `focus` draws the accent ring ("" = none).
+## overlaying widget texts. `focus` draws the accent ring ("" = none),
+## `pressed`/`hover` style pressed/hovered widgets ("" = none).
 ## Returns `1` when presented, `0` otherwise (null-safe).
-pub function render_present(root: Widget, surf, w: int, h: int, focus: string = "", pressed: string = "") -> int
+pub function render_present(root: Widget, surf, w: int, h: int, focus: string = "", pressed: string = "", hover: string = "") -> int
     if root is null or surf is null or w <= 0 or h <= 0
         return 0
     end
     let img = image_new(w, h, theme_bg())
     let texts = []
-    paint_tree(img, root, focus, pressed, texts)
+    paint_tree(img, root, focus, pressed, hover, texts)
     let i = 0
     while i < len(img.pixels)
         native_gpu_stage(surf, i, img.pixels[i])
@@ -255,7 +361,7 @@ pub function render_present(root: Widget, surf, w: int, h: int, focus: string = 
     let t = 0
     while t < len(texts)
         let item = texts[t]
-        native_gpu_text(surf, item["text"], item["x"], item["y"], 13, theme_text())
+        native_gpu_text(surf, item["text"], item["x"], item["y"], 13, item["color"])
         t += 1
     end
     return 1

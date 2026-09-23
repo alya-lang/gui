@@ -171,3 +171,79 @@ pub function image_to_ppm(img: Image) -> string
     end
     return out
 end
+
+## Integer square root (floor); returns `0` for negatives.
+pub function image_isqrt(n: int) -> int
+    if n <= 0
+        return 0
+    end
+    let lo = 1
+    let hi = n
+    if hi > 65536
+        hi = 65536
+    end
+    let ans = 1
+    while lo <= hi
+        let mid = (lo + hi) / 2
+        let sq = mid * mid
+        if sq == n
+            return mid
+        end
+        if sq < n
+            ans = mid
+            lo = mid + 1
+        else
+            hi = mid - 1
+        end
+    end
+    return ans
+end
+
+## Fills a disc; returns painted count.
+pub function image_circle_filled(img: Image, cx: int, cy: int, radius: int, color: int) -> int
+    if img is null or radius < 0
+        return 0
+    end
+    let n = 0
+    let dy = 0 - radius
+    while dy <= radius
+        let dx = image_isqrt(radius * radius - dy * dy)
+        n = n + image_rect(img, cx - dx, cy + dy, dx * 2 + 1, 1, color)
+        dy += 1
+    end
+    return n
+end
+
+## Fills a rounded rectangle (corner radius `r`, clamped); returns painted count.
+pub function image_rect_rounded(img: Image, x: int, y: int, w: int, h: int, r: int, color: int) -> int
+    if img is null
+        return 0
+    end
+    let rad = r
+    if rad < 0
+        rad = 0
+    end
+    if rad * 2 > w
+        rad = w / 2
+    end
+    if rad * 2 > h
+        rad = h / 2
+    end
+    if rad <= 0
+        return image_rect(img, x, y, w, h, color)
+    end
+    let n = 0
+    n = n + image_rect(img, x + rad, y, w - rad * 2, h, color)
+    n = n + image_rect(img, x, y + rad, rad, h - rad * 2, color)
+    n = n + image_rect(img, x + w - rad, y + rad, rad, h - rad * 2, color)
+    let cy = 0 - rad
+    while cy < 0
+        let dx = image_isqrt(rad * rad - cy * cy)
+        n = n + image_rect(img, x + rad - dx, y + rad + cy, dx, 1, color)
+        n = n + image_rect(img, x + w - rad, y + rad + cy, dx, 1, color)
+        n = n + image_rect(img, x + rad - dx, y + h - rad - cy - 1, dx, 1, color)
+        n = n + image_rect(img, x + w - rad, y + h - rad - cy - 1, dx, 1, color)
+        cy += 1
+    end
+    return n
+end

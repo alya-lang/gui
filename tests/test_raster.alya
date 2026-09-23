@@ -44,6 +44,33 @@ function main()
     runner_assert_str_eq(r, substring(ppm, 0, 2), "P3", "ppm magic")
     runner_assert(r, pkg::image_get_px(tiny, 1, 0) == 0, "second pixel black")
 
+    # 6. Integer square root
+    runner_assert_eq(r, pkg::image_isqrt(-5), 0, "isqrt negative is 0")
+    runner_assert_eq(r, pkg::image_isqrt(0), 0, "isqrt zero")
+    runner_assert_eq(r, pkg::image_isqrt(15), 3, "isqrt floors")
+    runner_assert_eq(r, pkg::image_isqrt(16), 4, "isqrt exact")
+    runner_assert_eq(r, pkg::image_isqrt(100), 10, "isqrt hundred")
+
+    # 7. Filled disc keeps edges, drops outside
+    let dc = pkg::canvas(11, 11, 0)
+    runner_assert(r, pkg::image_circle_filled(dc, 5, 5, 3, 6) > 0, "disc paints")
+    runner_assert_eq(r, pkg::image_get_px(dc, 5, 5), 6, "disc center")
+    runner_assert_eq(r, pkg::image_get_px(dc, 8, 5), 6, "disc east edge")
+    runner_assert_eq(r, pkg::image_get_px(dc, 5, 2), 6, "disc north tip")
+    runner_assert_eq(r, pkg::image_get_px(dc, 9, 5), 0, "disc outside empty")
+    runner_assert_eq(r, pkg::image_get_px(dc, 5, 1), 0, "disc above tip empty")
+
+    # 8. Rounded rect cuts corners, fills body
+    let rr = pkg::canvas(10, 10, 0)
+    runner_assert(r, pkg::image_rect_rounded(rr, 0, 0, 10, 10, 3, 7) > 0, "rounded paints")
+    runner_assert_eq(r, pkg::image_get_px(rr, 0, 0), 0, "corner cut")
+    runner_assert_eq(r, pkg::image_get_px(rr, 9, 0), 0, "corner cut far")
+    runner_assert_eq(r, pkg::image_get_px(rr, 0, 9), 0, "corner cut bottom")
+    runner_assert_eq(r, pkg::image_get_px(rr, 5, 0), 7, "top edge kept")
+    runner_assert_eq(r, pkg::image_get_px(rr, 0, 5), 7, "left edge kept")
+    runner_assert_eq(r, pkg::image_get_px(rr, 5, 5), 7, "center filled")
+    runner_assert_eq(r, pkg::image_get_px(rr, 1, 1), 7, "inner corner filled")
+
     let failed = runner_summary(r)
     if failed > 0
         exit(1)
