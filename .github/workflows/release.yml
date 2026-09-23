@@ -64,10 +64,48 @@ jobs:
           cp -r src "$STAGE/"
           if [ -d c ]; then cp -r c "$STAGE/"; fi
           if [ -d examples ]; then cp -r examples "$STAGE/"; fi
-          # Reproducible bytes: sorted entries, fixed mtimes/owners, and
-          # `gzip -n` (no embedded filename/timestamp) so identical commits
+          # Pack with Python stdlib (tarfile+gzip): the runner's `tar` flavor
+          # varies (GNU vs bsdtar), but Python is already set up and always
+          # available. Reproducible bytes: sorted entries, zeroed
+          # mtimes/owners, PAX format, `gzip` mtime=0 — identical commits
           # always produce identical archives.
-          tar --sort-name --owner=0 --group=0 --mtime='UTC 2020-01-01' -cf - -C pkg-stage "${REPO}-${TAG}" | gzip -n > alya-pkg.tar.gz
+          python3 - "$STAGE" alya-pkg.tar.gz <<'EOF'
+          import sys, os, io, tarfile, gzip
+          stage, out = sys.argv[1], sys.argv[2]
+          top = os.path.basename(os.path.normpath(stage))
+          entries = []
+          for root, dirs, files in os.walk(stage):
+              dirs.sort()
+              for name in sorted(dirs) + sorted(files):
+                  full = os.path.join(root, name)
+                  arc = (top + "/" + os.path.relpath(full, stage)).replace(os.sep, "/")
+                  entries.append((full, arc))
+          entries.sort(key=lambda e: e[1])
+          buf = io.BytesIO()
+          with tarfile.open(fileobj=buf, mode="w", format=tarfile.PAX_FORMAT) as tf:
+              top_ti = tarfile.TarInfo(top + "/")
+              top_ti.type = tarfile.DIRTYPE
+              top_ti.mtime = 0
+              top_ti.uid = 0
+              top_ti.gid = 0
+              top_ti.uname = ""
+              top_ti.gname = ""
+              tf.addfile(top_ti)
+              for full, arc in entries:
+                  ti = tf.gettarinfo(full, arc)
+                  ti.mtime = 0
+                  ti.uid = 0
+                  ti.gid = 0
+                  ti.uname = ""
+                  ti.gname = ""
+                  if ti.isdir():
+                      tf.addfile(ti)
+                  else:
+                      with open(full, "rb") as f:
+                          tf.addfile(ti, f)
+          with open(out, "wb") as f:
+              f.write(gzip.compress(buf.getvalue(), compresslevel=9, mtime=0))
+          EOF
           sha256sum alya-pkg.tar.gz > alya-pkg.tar.gz.sha256
           ls -la alya-pkg.tar.gz alya-pkg.tar.gz.sha256
 
