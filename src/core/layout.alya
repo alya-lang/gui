@@ -1,0 +1,49 @@
+## gui/core/layout — headless box layout solver
+##
+## Part of the Alya Language package ecosystem (https://github.com/alya-lang).
+## Vertical/horizontal stacking inside a container rect with padding and
+## spacing. Pure integer math: fully covered by `alya test` on headless CI.
+
+import "../types.alya"
+import "./geometry.alya"
+
+## Shrinks a container rect by `padding` on every side (flooring at zero).
+pub function layout_padding(container: Rect, padding: int) -> Rect
+    return rect_inset(container, padding, padding)
+end
+
+## Stacks child sizes top-down inside `container`.
+##
+## Each child keeps its declared size; the row width fills the inner width.
+## Returns positioned rects in input order (empty array for empty input).
+pub function layout_vbox(container: Rect, padding: int, spacing: int, sizes: Size[]) -> Rect[]
+    let inner = layout_padding(container, padding)
+    let out = []
+    let y = inner.y
+    let i = 0
+    while i < len(sizes)
+        let s: Size = sizes[i]
+        out.push(Rect { x: inner.x, y: y, w: inner.w, h: s.h })
+        y = y + s.h + spacing
+        i += 1
+    end
+    return out
+end
+
+## Stacks child sizes left-to-right inside `container`.
+##
+## Each child keeps its declared size; the column height fills the inner
+## height. Returns positioned rects in input order.
+pub function layout_hbox(container: Rect, padding: int, spacing: int, sizes: Size[]) -> Rect[]
+    let inner = layout_padding(container, padding)
+    let out = []
+    let x = inner.x
+    let i = 0
+    while i < len(sizes)
+        let s: Size = sizes[i]
+        out.push(Rect { x: x, y: inner.y, w: s.w, h: inner.h })
+        x = x + s.w + spacing
+        i += 1
+    end
+    return out
+end

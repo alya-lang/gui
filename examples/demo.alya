@@ -28,9 +28,21 @@ function main()
     pkg::event_queue_push(q, pkg::event_new(pkg::GuiEventKind.MouseDown, 5, 6))
     pkg::event_queue_push(q, pkg::event_new(pkg::GuiEventKind.Close))
     say "Queued: " + str(pkg::event_queue_len(q))
-    let ev = pkg::event_queue_poll(q)
+    let ev: GuiEvent = pkg::event_queue_poll(q)
     say "Polled kind: " + str(ev.kind)
     say "Remaining: " + str(pkg::event_queue_len(q))
+    say ""
+
+    say "--- Layout & Widgets ---"
+    let rows: Rect[] = pkg::vbox(pkg::rect(0, 0, 200, 200), 10, 5, [pkg::size(0, 30)])
+    let r0: Rect = rows[0]
+    say "Row0: (" + str(r0.x) + ", " + str(r0.y) + ", " + str(r0.w) + ", " + str(r0.h) + ")"
+    let root = pkg::widget("box", "root")
+    pkg::widget_set_rect(root, pkg::rect(0, 0, 200, 200))
+    let btn = pkg::button("ok", "OK")
+    pkg::widget_set_rect(btn, pkg::rect(10, 10, 80, 30))
+    pkg::widget_add_child(root, btn)
+    say "Clicked: " + str(pkg::click(root, 20, 20))
     say ""
 
     say "--- Color ---"

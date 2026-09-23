@@ -1,0 +1,159 @@
+## gui/widgets/node — retained widget tree
+##
+## Part of the Alya Language package ecosystem (https://github.com/alya-lang).
+## Parent/child widget hierarchy with visibility, enablement, hit-testing,
+## and click dispatch. Headless: no window is ever opened.
+
+import "../types.alya"
+import "../core/geometry.alya"
+
+## Retained widget node.
+##
+## ### Fields
+## - `id`: Stable identifier for lookup (`""` for anonymous nodes).
+## - `kind`: Widget kind (`"box"`, `"button"`, `"label"`, `"textinput"`, `"checkbox"`, `"canvas"`).
+## - `rect`: Position and size in parent coordinates.
+## - `visible`: `1` shown, `0` hidden (hidden subtrees never hit-test).
+## - `enabled`: `1` interactive, `0` inert (disabled nodes never dispatch).
+## - `text`: Caption or input content.
+## - `value`: Generic state slot (checkbox checked flag).
+## - `children`: Child widgets in paint/hit order.
+## - `on_click`: Click callback `fn(widget)` or null.
+## - `on_change`: Change callback `fn(widget)` or null.
+pub struct Widget
+    id: string,
+    kind: string,
+    rect: Rect,
+    visible: int,
+    enabled: int,
+    text: string,
+    value: int,
+    children: array,
+    on_click,
+    on_change
+end
+
+## Creates a visible, enabled widget node with empty children.
+pub function widget_new(kind: string, id: string = "") -> Widget
+    return Widget {
+        id: id,
+        kind: kind,
+        rect: Rect { x: 0, y: 0, w: 0, h: 0 },
+        visible: 1,
+        enabled: 1,
+        text: "",
+        value: 0,
+        children: [],
+        on_click: null,
+        on_change: null
+    }
+end
+
+## Appends a child; returns the child count afterwards.
+pub function widget_add_child(parent: Widget, child: Widget) -> int
+    if parent is null or child is null
+        return widget_child_count(parent)
+    end
+    parent.children.push(child)
+    return widget_child_count(parent)
+end
+
+## Returns the child count (`0` for null parents).
+pub function widget_child_count(parent: Widget) -> int
+    if parent is null
+        return 0
+    end
+    return len(parent.children)
+end
+
+## Returns the child at `index`, or null when out of range.
+pub function widget_child(parent: Widget, index: int)
+    if parent is null or index < 0 or index >= len(parent.children)
+        return null
+    end
+    return parent.children[index]
+end
+
+## Depth-first search by id; returns the node or null.
+pub function widget_find(root: Widget, id: string)
+    if root is null or id is null
+        return null
+    end
+    if root.id == id
+        return root
+    end
+    let i = 0
+    while i < len(root.children)
+        let hit = widget_find(root.children[i], id)
+        if hit is not null
+            return hit
+        end
+        i += 1
+    end
+    return null
+end
+
+## Deepest visible child containing (`x`, `y`); falls back to `root`
+## itself when it contains the point, else null. Invisible subtrees
+## never participate.
+pub function widget_hit(root: Widget, x: int, y: int)
+    if root is null or root.visible == 0
+        return null
+    end
+    let i = len(root.children) - 1
+    while i >= 0
+        let hit = widget_hit(root.children[i], x, y)
+        if hit is not null
+            return hit
+        end
+        i -= 1
+    end
+    if rect_contains(root.rect, x, y) == 1
+        return root
+    end
+    return null
+end
+
+## Moves/resizes the node in parent coordinates.
+pub function widget_set_rect(w: Widget, r: Rect) -> int
+    if w is null
+        return 0
+    end
+    w.rect = r
+    return 1
+end
+
+## Sets caption/content text.
+pub function widget_set_text(w: Widget, text: string) -> int
+    if w is null
+        return 0
+    end
+    w.text = text
+    return 1
+end
+
+## Shows (`1`) or hides (`0`) the node; returns the new flag.
+pub function widget_set_visible(w: Widget, flag: int) -> int
+    if w is null
+        return 0
+    end
+    if flag == 0
+        w.visible = 0
+        return 0
+    end
+    w.visible = 1
+    return 1
+end
+
+## Enables (`1`) or disables (`0`) the node; returns the new flag.
+pub function widget_set_enabled(w: Widget, flag: int) -> int
+    if w is null
+        return 0
+    end
+    if flag == 0
+        w.enabled = 0
+        return 0
+    end
+    w.enabled = 1
+    return 1
+end

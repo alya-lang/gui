@@ -1,0 +1,46 @@
+## Layout solver tests for gui
+## Part of the Alya Language package ecosystem (https://github.com/alya-lang)
+
+import "std/test"
+import "../src/lib.alya" as pkg
+
+function main()
+    test_suite("gui Layout Tests")
+    let r = runner_new()
+
+    let c = pkg::rect(0, 0, 200, 200)
+    let sizes = [pkg::size(0, 30), pkg::size(0, 40)]
+
+    let rows: Rect[] = pkg::vbox(c, 10, 5, sizes)
+    let r0: Rect = rows[0]
+    let r1: Rect = rows[1]
+    runner_assert_eq(r, len(rows), 2, "vbox two rows")
+    runner_assert_eq(r, r0.x, 10, "vbox row0 x")
+    runner_assert_eq(r, r0.y, 10, "vbox row0 y")
+    runner_assert_eq(r, r0.w, 180, "vbox row fills inner width")
+    runner_assert_eq(r, r0.h, 30, "vbox row0 keeps height")
+    runner_assert_eq(r, r1.y, 45, "vbox row1 y with spacing")
+    runner_assert_eq(r, r1.h, 40, "vbox row1 keeps height")
+
+    let cols: Rect[] = pkg::hbox(c, 10, 5, sizes)
+    let c0: Rect = cols[0]
+    let c1: Rect = cols[1]
+    runner_assert_eq(r, len(cols), 2, "hbox two cols")
+    runner_assert_eq(r, c0.x, 10, "hbox col0 x")
+    runner_assert_eq(r, c0.h, 180, "hbox col fills inner height")
+    runner_assert_eq(r, c1.x, 15, "hbox col1 x with spacing")
+
+    let empty = pkg::vbox(c, 10, 5, [])
+    runner_assert_eq(r, len(empty), 0, "vbox empty input")
+
+    let pad = pkg::layout_padding(c, 25)
+    runner_assert_eq(r, pad.x, 25, "padding x")
+    runner_assert_eq(r, pad.w, 150, "padding w")
+
+    let failed = runner_summary(r)
+    if failed > 0
+        exit(1)
+    end
+end
+
+main()

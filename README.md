@@ -88,8 +88,19 @@ function main()
     # 3. Event queue: feed mouse + close, drain in order
     let q = pkg::event_queue()
     pkg::event_queue_push(q, pkg::event_new(pkg::GuiEventKind.MouseDown, 5, 6))
-    let ev = pkg::event_queue_poll(q)
+    let ev: GuiEvent = pkg::event_queue_poll(q)
     say f"Polled kind: {ev.kind}"
+
+    # 4. Layout + retained widgets (headless)
+    let rows: Rect[] = pkg::vbox(pkg::rect(0, 0, 200, 200), 10, 5, [pkg::size(0, 30)])
+    let r0: Rect = rows[0]
+    say f"Row0: ({r0.x}, {r0.y}, {r0.w}, {r0.h})"
+    let root = pkg::widget("box", "root")
+    pkg::widget_set_rect(root, pkg::rect(0, 0, 200, 200))
+    let btn = pkg::button("ok", "OK")
+    pkg::widget_set_rect(btn, pkg::rect(10, 10, 80, 30))
+    pkg::widget_add_child(root, btn)
+    say f"Clicked: {pkg::click(root, 20, 20)}"
 end
 
 main()
@@ -117,7 +128,17 @@ main()
 | `rect_inset(r, dx, dy)` | `pub function` | Shrinks the rect on every side. |
 | `overlap_area(a, b)` | `pub function` | Overlap area of two rects (`0` when disjoint). |
 | `rgb(r, g, b)` / `rgba(r, g, b, a)` | `pub function` | Opaque / transparent `Color` constructors. |
+| `vbox(container, padding, spacing, sizes)` | `pub function` | Stacks `Size[]` top-down; returns positioned `Rect[]`. |
+| `hbox(container, padding, spacing, sizes)` | `pub function` | Stacks `Size[]` left-to-right; returns positioned `Rect[]`. |
+| `widget(kind, id)` | `pub function` | Generic retained widget node. |
+| `button(id, text)` / `label(id, text)` | `pub function` | Button and static label constructors. |
+| `textinput(id, text)` / `checkbox(id, checked)` | `pub function` | Text input and checkbox constructors. |
+| `click(root, x, y)` | `pub function` | Point-click dispatch over a widget tree (`1` consumed, `0` miss). |
+| `widget_add_child(parent, child)` | `pub function` | Appends a child; returns child count. |
+| `widget_find(root, id)` | `pub function` | Depth-first lookup by id (null when missing). |
+| `widget_hit(root, x, y)` | `pub function` | Deepest visible node containing the point. |
 | `c_add(a, b)` | `pub function` | Bundled C engine smoke test via FFI. |
+| `Widget` | `pub struct` | Retained node (`id`, `kind`, `rect`, `visible`, `enabled`, `text`, `value`, `children`, callbacks). |
 | `GuiBackend` | `pub enum` | Backend codes (`Unknown = 0`, `Windows = 1`, `MacOs = 2`, `Wayland = 3`, `X11 = 4`). |
 | `GuiEventKind` | `pub enum` | Event kinds (`Close = 1`, `MouseDown = 4`, `KeyDown = 6`, `TextInput = 8`, ...). |
 | `Point` / `Size` / `Rect` / `Color` | `pub struct` | Geometry primitives with methods (`area()`, `is_empty()`, `contains()`, `to_string()`). |

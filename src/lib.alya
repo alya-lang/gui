@@ -9,6 +9,9 @@ import "./types.alya"
 import "./core/geometry.alya"
 import "./core/backend.alya"
 import "./core/events.alya"
+import "./core/layout.alya"
+import "./widgets/node.alya"
+import "./widgets/controls.alya"
 import "./ffi.alya"
 
 ## Creates a window configuration with validated dimensions.
@@ -42,6 +45,11 @@ pub function rgba(r: int, g: int, b: int, a: int = 255) -> Color
     return color_rgba(r, g, b, a)
 end
 
+## Builds 2D dimensions.
+pub function size(w: int = 0, h: int = 0) -> Size
+    return size_new(w, h)
+end
+
 ## Builds a rectangle from origin plus dimensions.
 pub function rect(x: int = 0, y: int = 0, w: int = 0, h: int = 0) -> Rect
     return rect_new(x, y, w, h)
@@ -52,6 +60,46 @@ end
 ## Damage-region helper composing `rect_intersect` with `Rect.area`.
 pub function overlap_area(a: Rect, b: Rect) -> int
     return rect_intersect(a, b).area()
+end
+
+## Creates a generic widget node.
+pub function widget(kind: string, id: string = "") -> Widget
+    return widget_new(kind, id)
+end
+
+## Creates a push button with caption text.
+pub function button(id: string, text: string = "") -> Widget
+    return button_new(id, text)
+end
+
+## Creates a static text label.
+pub function label(id: string, text: string = "") -> Widget
+    return label_new(id, text)
+end
+
+## Creates a single-line text input.
+pub function textinput(id: string, text: string = "") -> Widget
+    return textinput_new(id, text)
+end
+
+## Creates a checkbox (`checked` sets the initial flag).
+pub function checkbox(id: string, checked: int = 0) -> Widget
+    return checkbox_new(id, checked)
+end
+
+## Dispatches a point click over a widget tree (see `dispatch_click`).
+pub function click(root: Widget, x: int, y: int) -> int
+    return dispatch_click(root, x, y)
+end
+
+## Stacks child sizes top-down inside a container (see `layout_vbox`).
+pub function vbox(container: Rect, padding: int, spacing: int, sizes: Size[]) -> Rect[]
+    return layout_vbox(container, padding, spacing, sizes)
+end
+
+## Stacks child sizes left-to-right inside a container (see `layout_hbox`).
+pub function hbox(container: Rect, padding: int, spacing: int, sizes: Size[]) -> Rect[]
+    return layout_hbox(container, padding, spacing, sizes)
 end
 
 ## Native C FFI helper (bundled engine smoke test).

@@ -1,0 +1,89 @@
+## gui/widgets/controls — retained controls and click dispatch
+##
+## Part of the Alya Language package ecosystem (https://github.com/alya-lang).
+## Button, label, text input, and checkbox constructors plus point-click
+## dispatch over the widget tree. Headless: callbacks run synchronously.
+
+import "./node.alya"
+
+## Creates a push button with caption text.
+pub function button_new(id: string, text: string = "") -> Widget
+    let w = widget_new("button", id)
+    w.text = text
+    return w
+end
+
+## Creates a static text label.
+pub function label_new(id: string, text: string = "") -> Widget
+    let w = widget_new("label", id)
+    w.text = text
+    return w
+end
+
+## Creates a single-line text input with initial content.
+pub function textinput_new(id: string, text: string = "") -> Widget
+    let w = widget_new("textinput", id)
+    w.text = text
+    return w
+end
+
+## Creates a checkbox (`value` is the checked flag).
+pub function checkbox_new(id: string, checked: int = 0) -> Widget
+    let w = widget_new("checkbox", id)
+    if checked == 0
+        w.value = 0
+    else
+        w.value = 1
+    end
+    return w
+end
+
+## Attaches a click callback `fn(widget)`; returns the node for chaining.
+pub function widget_on_click(w: Widget, cb)
+    if w is null
+        return w
+    end
+    w.on_click = cb
+    return w
+end
+
+## Attaches a change callback `fn(widget)`; returns the node for chaining.
+pub function widget_on_change(w: Widget, cb)
+    if w is null
+        return w
+    end
+    w.on_change = cb
+    return w
+end
+
+## Dispatches a point click: hit-tests from `root`, then activates.
+##
+## - Button (enabled): runs `on_click` when set, returns `1`.
+## - Checkbox (enabled): toggles `value`, runs `on_change` when set, returns `1`.
+## - Anything else, disabled nodes, or a miss: returns `0`.
+pub function dispatch_click(root: Widget, x: int, y: int) -> int
+    let target = widget_hit(root, x, y)
+    if target is null or target.enabled == 0
+        return 0
+    end
+    if target.kind == "button"
+        if target.on_click is not null
+            let cb = target.on_click
+            cb(target)
+        end
+        return 1
+    end
+    if target.kind == "checkbox"
+        if target.value == 0
+            target.value = 1
+        else
+            target.value = 0
+        end
+        if target.on_change is not null
+            let ccb = target.on_change
+            ccb(target)
+        end
+        return 1
+    end
+    return 0
+end
