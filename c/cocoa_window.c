@@ -77,7 +77,8 @@ struct alya_gui_window {
     alya_gui_event_t queue[ALYA_GUI_MAX_EVENTS];
 };
 
-static void alya_gui_push_event(alya_gui_window_t *win, int32_t kind) {
+static void alya_gui_push_event(alya_gui_window_t *win, int32_t kind,
+                                int32_t key) {
     int32_t next;
     if (win == NULL) {
         return;
@@ -86,12 +87,43 @@ static void alya_gui_push_event(alya_gui_window_t *win, int32_t kind) {
     if (next == win->head) {
         return;
     }
+    // Coalesce mouse-motion floods: a trailing unconsumed MOUSE_MOVE is
+    // refreshed in place so drags cannot starve clicks/keys.
+    if (kind == ALYA_GUI_EVENT_MOUSE_MOVE && win->head != win->tail) {
+        int32_t last = (win->tail + ALYA_GUI_MAX_EVENTS - 1) % ALYA_GUI_MAX_EVENTS;
+        if (win->queue[last].kind == ALYA_GUI_EVENT_MOUSE_MOVE) {
+            win->queue[last].width = win->width;
+            win->queue[last].height = win->height;
+            win->queue[last].mouse_x = win->mouse_x;
+            win->queue[last].mouse_y = win->mouse_y;
+            return;
+        }
+    }
     win->queue[win->tail].kind = kind;
     win->queue[win->tail].width = win->width;
     win->queue[win->tail].height = win->height;
     win->queue[win->tail].mouse_x = win->mouse_x;
     win->queue[win->tail].mouse_y = win->mouse_y;
+    win->queue[win->tail].key = key;
     win->tail = next;
+}
+
+// UTF-8 stash for the latest TEXT_INPUT payload (truncated, NUL-terminated).
+#define ALYA_GUI_TEXT_STASH 128
+static char alya_gui_text_stash[ALYA_GUI_TEXT_STASH];
+
+static void alya_gui_set_text(const char *utf8) {
+    size_t n;
+    if (utf8 == NULL) {
+        alya_gui_text_stash[0] = '\0';
+        return;
+    }
+    n = strlen(utf8);
+    if (n > ALYA_GUI_TEXT_STASH - 1) {
+        n = ALYA_GUI_TEXT_STASH - 1;
+    }
+    memcpy(alya_gui_text_stash, utf8, n);
+    alya_gui_text_stash[n] = '\0';
 }
 
 static SEL alya_sel(const char *name) {
@@ -287,7 +319,7 @@ int32_t alya_gui_window_poll(alya_gui_window_t *win, alya_gui_event_t *out) {
             unsigned long t =
                 ((unsigned long(*)(id, SEL))objc_msgSend)(ev, sel);
             // NSEventTypeLeftMouseDown = 1, LeftMouseUp = 2, MouseMoved = 5,
-            // KeyDown = 10, KeyUp = 11. Track mouse via windowConvertPoint.
+            // KeyDown = 10, KeyUp = 11. Track mouse via locationInWindow.
             if (t == 1 || t == 2 || t == 5) {
                 sel = alya_sel("window");
                 winObj = ((id(*)(id, SEL))objc_msgSend)(ev, sel);
@@ -305,6 +337,42 @@ int32_t alya_gui_window_poll(alya_gui_window_t *win, alya_gui_event_t *out) {
 #endif
                     win->mouse_x = (int32_t)pt.x;
                     win->mouse_y = (int32_t)pt.y;
+                    if (t == 1) {
+                        alya_gui_push_event(win, ALYA_GUI_EVENT_MOUSE_DOWN, 0);
+                    } else if (t == 2) {
+                        alya_gui_push_event(win, ALYA_GUI_EVENT_MOUSE_UP, 0);
+                    } else {
+                        alya_gui_push_event(win, ALYA_GUI_EVENT_MOUSE_MOVE, 0);
+                    }
+                }
+            } else if (t == 10 || t == 11) {
+                // Keyboard: hardware keyCode in `key`; printable text via
+                // `characters` as a TEXT_INPUT companion event.
+                unsigned short code;
+                sel = alya_sel("keyCode");
+                code = ((unsigned short(*)(id, SEL))objc_msgSend)(ev, sel);
+                if (t == 10) {
+                    id chars;
+                    const char *utf8;
+                    alya_gui_push_event(win, ALYA_GUI_EVENT_KEY_DOWN,
+                                        (int32_t)code);
+                    sel = alya_sel("characters");
+                    chars = ((id(*)(id, SEL))objc_msgSend)(ev, sel);
+                    utf8 = NULL;
+                    if (chars != NULL) {
+                        sel = alya_sel("UTF8String");
+                        utf8 = ((const char *(*)(id, SEL))objc_msgSend)(
+                            chars, sel);
+                    }
+                    if (utf8 != NULL && utf8[0] != '\0' &&
+                        !((unsigned char)utf8[0] < 0x20 ||
+                          (utf8[0] == 0x7F && utf8[1] == '\0'))) {
+                        alya_gui_set_text(utf8);
+                        alya_gui_push_event(win, ALYA_GUI_EVENT_TEXT_INPUT, 0);
+                    }
+                } else {
+                    alya_gui_push_event(win, ALYA_GUI_EVENT_KEY_UP,
+                                        (int32_t)code);
                 }
             }
         }
@@ -322,7 +390,7 @@ int32_t alya_gui_window_poll(alya_gui_window_t *win, alya_gui_event_t *out) {
         BOOL vis = ((BOOL(*)(id, SEL))objc_msgSend)(win->window, visSel);
         if (!vis && win->open == 1 && win->shown && !win->hidden_by_api) {
             win->open = 0;
-            alya_gui_push_event(win, ALYA_GUI_EVENT_CLOSE);
+            alya_gui_push_event(win, ALYA_GUI_EVENT_CLOSE, 0);
         }
     }
     if (win->head == win->tail) {
@@ -384,7 +452,7 @@ void alya_gui_window_close(alya_gui_window_t *win) {
     ((void(*)(id, SEL, id))objc_msgSend)(win->window, sel, NULL);
 }
 
-static alya_gui_event_t alya_gui_stashed = {0, 0, 0, 0, 0};
+static alya_gui_event_t alya_gui_stashed = {0, 0, 0, 0, 0, 0};
 
 int32_t alya_gui_window_poll_event(alya_gui_window_t *win) {
     alya_gui_stashed.kind = 0;
@@ -392,6 +460,8 @@ int32_t alya_gui_window_poll_event(alya_gui_window_t *win) {
     alya_gui_stashed.height = 0;
     alya_gui_stashed.mouse_x = 0;
     alya_gui_stashed.mouse_y = 0;
+    alya_gui_stashed.key = 0;
+    alya_gui_text_stash[0] = '\0';
     if (win == NULL) {
         return 0;
     }
@@ -415,4 +485,12 @@ int32_t alya_gui_event_mouse_x(void) {
 
 int32_t alya_gui_event_mouse_y(void) {
     return alya_gui_stashed.mouse_y;
+}
+
+int32_t alya_gui_event_key(void) {
+    return alya_gui_stashed.key;
+}
+
+const char *alya_gui_event_text(void) {
+    return alya_gui_text_stash;
 }

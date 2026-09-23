@@ -1,0 +1,403 @@
+## gui/core/input — mouse/keyboard dispatch with focus tracking
+##
+## Part of the Alya Language package ecosystem (https://github.com/alya-lang).
+## Headless half of Phase 3 input handling: hit-testing, hover, press/release
+## pairing, keyboard focus routing, and single-line text editing over the
+## retained widget tree. Native backends feed `GuiEvent` records; tests and
+## examples inject them directly. No window is ever opened here.
+##
+## Key codes are opaque platform values (Win32 VK_*, Cocoa keyCode, X11
+## KeySym, Wayland evdev). Well-known editing keys are consumed by number:
+## Backspace = 8, Enter = 13, Escape = 27, Space = 32, Left/Up/Right/Down =
+## 37/38/39/40. Printable text always arrives via `dispatch_text`, never by
+## key code, so layouts and IME stay correct.
+
+import "../types.alya"
+import "../widgets/node.alya"
+import "../widgets/controls.alya"
+import "./state.alya"
+
+## Per-window input state: focus/hover/pressed widget ids plus the last
+## known mouse position. Ids (not pointers) survive tree rebuilds; every
+## dispatch re-resolves them, so stale ids safely miss.
+pub struct InputState
+    focus: string,
+    hover: string,
+    pressed: string,
+    mouse_x: int,
+    mouse_y: int
+end
+
+## Creates empty input state (no focus, hover, or press).
+pub function input_new() -> InputState
+    return InputState { focus: "", hover: "", pressed: "", mouse_x: 0, mouse_y: 0 }
+end
+
+## Returns the focused widget id (`""` when none).
+pub function input_focused(st: InputState) -> string
+    if st is null
+        return ""
+    end
+    return st.focus
+end
+
+## Returns the hovered widget id (`""` when none).
+pub function input_hovered(st: InputState) -> string
+    if st is null
+        return ""
+    end
+    return st.hover
+end
+
+## Returns 1 when `kind` can take keyboard focus.
+pub function input_is_focusable(kind: string) -> int
+    if kind == "button" or kind == "textinput" or kind == "textarea"
+        return 1
+    end
+    if kind == "checkbox" or kind == "radio" or kind == "slider"
+        return 1
+    end
+    if kind == "dropdown" or kind == "listview"
+        return 1
+    end
+    return 0
+end
+
+## Moves focus to the widget `id` when it exists and is focusable.
+##
+## Returns `1` on success, `0` when the id is missing or not focusable
+## (focus is left unchanged).
+pub function input_focus(st: InputState, root: Widget, id: string) -> int
+    if st is null or root is null or id is null or id == ""
+        return 0
+    end
+    let target = widget_find(root, id)
+    if target is null or target.enabled == 0
+        return 0
+    end
+    if input_is_focusable(target.kind) == 0
+        return 0
+    end
+    st.focus = id
+    return 1
+end
+
+## Clears keyboard focus; returns `1`.
+pub function input_blur(st: InputState) -> int
+    if st is null
+        return 0
+    end
+    st.focus = ""
+    return 1
+end
+
+## Routes mouse motion: updates the position, refreshes hover to the
+## topmost hit id (`""` on a miss). Returns `1` when hover changed.
+pub function dispatch_mouse_move(st: InputState, root: Widget, x: int, y: int) -> int
+    if st is null
+        return 0
+    end
+    st.mouse_x = x
+    st.mouse_y = y
+    let id = ""
+    if root is not null
+        let hit = widget_hit(root, x, y)
+        if hit is not null
+            id = hit.id
+        end
+    end
+    if id == st.hover
+        return 0
+    end
+    st.hover = id
+    return 1
+end
+
+## Routes mouse press: records the pressed id, moves focus to a focusable
+## hit. A miss clears the press and blurs focus. Returns `1` when a live
+## (enabled) widget was hit, else `0`.
+pub function dispatch_mouse_down(st: InputState, root: Widget, x: int, y: int) -> int
+    if st is null
+        return 0
+    end
+    st.mouse_x = x
+    st.mouse_y = y
+    st.pressed = ""
+    if root is null
+        st.focus = ""
+        return 0
+    end
+    let hit = widget_hit(root, x, y)
+    if hit is null or hit.enabled == 0
+        st.focus = ""
+        return 0
+    end
+    st.pressed = hit.id
+    if input_is_focusable(hit.kind) == 1
+        st.focus = hit.id
+    end
+    return 1
+end
+
+## Routes mouse release: a release over the pressed widget activates it
+## (same semantics as `dispatch_click`); anywhere else just clears the
+## press. Returns the activation result (`1`/`0`).
+pub function dispatch_mouse_up(st: InputState, root: Widget, x: int, y: int) -> int
+    if st is null
+        return 0
+    end
+    st.mouse_x = x
+    st.mouse_y = y
+    if st.pressed == "" or root is null
+        st.pressed = ""
+        return 0
+    end
+    let target = widget_find(root, st.pressed)
+    st.pressed = ""
+    if target is null or target.enabled == 0
+        return 0
+    end
+    let hit = widget_hit(root, x, y)
+    if hit is null or hit.id != target.id
+        return 0
+    end
+    return dispatch_click(root, x, y)
+end
+
+## Routes a key press to the focused widget. Returns `1` when consumed.
+##
+## - Button/checkbox/radio + Enter/Space: activates (click semantics).
+## - Slider + arrows: steps the value, fires `on_change`.
+## - Dropdown/listview + Up/Down: moves the selection, fires `on_change`.
+## - Textinput/textarea + Backspace: drops the last byte, fires `on_change`.
+## - Textinput + Enter: fires `on_change` (commit), keeps focus.
+## - Escape: clears focus.
+## Anything else (or no live focus): returns `0`; printable characters
+## arrive separately via `dispatch_text`.
+pub function dispatch_key(st: InputState, root: Widget, key: int) -> int
+    if st is null or root is null
+        return 0
+    end
+    if key == 27
+        st.focus = ""
+        return 1
+    end
+    if st.focus == ""
+        return 0
+    end
+    let target = widget_find(root, st.focus)
+    if target is null or target.enabled == 0
+        return 0
+    end
+    if target.kind == "button" or target.kind == "checkbox" or target.kind == "radio"
+        if key == 13 or key == 32
+            return dispatch_click(root, widget_center_x(target), widget_center_y(target))
+        end
+        return 0
+    end
+    if target.kind == "slider"
+        return slider_key(target, key)
+    end
+    if target.kind == "dropdown" or target.kind == "listview"
+        return option_key(target, key)
+    end
+    if target.kind == "textinput" or target.kind == "textarea"
+        if key == 8
+            return textinput_backspace(target)
+        end
+        if key == 13 and target.kind == "textinput"
+            if target.on_change is not null
+                let cb = target.on_change
+                cb(target)
+            end
+            return 1
+        end
+        return 0
+    end
+    return 0
+end
+
+## Routes committed text to the focused text input (`TextInput` kind).
+##
+## Appends `text` to a live textinput/textarea, marks it dirty, fires
+## `on_change`. Returns `1` when applied, `0` otherwise.
+pub function dispatch_text(st: InputState, root: Widget, text: string) -> int
+    if st is null or root is null or text is null or text == ""
+        return 0
+    end
+    if st.focus == ""
+        return 0
+    end
+    let target = widget_find(root, st.focus)
+    if target is null or target.enabled == 0
+        return 0
+    end
+    if target.kind != "textinput" and target.kind != "textarea"
+        return 0
+    end
+    return textinput_append(target, text)
+end
+
+## Applies one queued `GuiEvent` to the tree; returns the handler result.
+##
+## Mouse kinds drive the press/release pairing, KeyDown/TextInput route to
+## focus, Focus syncs native focus (`key == 1` focuses the hovered widget,
+## `0` blurs). Close/Resize/Redraw are observed, not consumed (return `0`).
+pub function dispatch_event(st: InputState, root: Widget, ev: GuiEvent) -> int
+    if st is null or ev is null
+        return 0
+    end
+    if ev.kind == GuiEventKind.MouseMove
+        return dispatch_mouse_move(st, root, ev.x, ev.y)
+    end
+    if ev.kind == GuiEventKind.MouseDown
+        return dispatch_mouse_down(st, root, ev.x, ev.y)
+    end
+    if ev.kind == GuiEventKind.MouseUp
+        return dispatch_mouse_up(st, root, ev.x, ev.y)
+    end
+    if ev.kind == GuiEventKind.KeyDown
+        return dispatch_key(st, root, ev.key)
+    end
+    if ev.kind == GuiEventKind.TextInput
+        return dispatch_text(st, root, ev.text)
+    end
+    if ev.kind == GuiEventKind.Focus
+        if ev.key == 0
+            return input_blur(st)
+        end
+        if root is not null and st.hover != ""
+            return input_focus(st, root, st.hover)
+        end
+        return 0
+    end
+    return 0
+end
+
+## Maps a widget kind to its cursor style (`"text"` for editors,
+## `"pointer"` for clickables, `"arrow"` otherwise). Native backends apply
+## this when the hover target changes.
+pub function cursor_for(kind: string) -> string
+    if kind == "textinput" or kind == "textarea"
+        return "text"
+    end
+    if kind == "button" or kind == "checkbox" or kind == "radio"
+        return "pointer"
+    end
+    if kind == "slider" or kind == "dropdown" or kind == "listview"
+        return "pointer"
+    end
+    return "arrow"
+end
+
+# Widget center in parent coordinates (keyboard activation point).
+function widget_center_x(w: Widget) -> int
+    return w.rect.x + w.rect.w / 2
+end
+
+function widget_center_y(w: Widget) -> int
+    return w.rect.y + w.rect.h / 2
+end
+
+# Steps a slider with arrow keys; returns 1 when the value moved.
+function slider_key(slider: Widget, key: int) -> int
+    let step = (slider.max_val - slider.min_val) / 10
+    if step < 1
+        step = 1
+    end
+    if key == 37 or key == 40
+        return slider_set_value(slider, slider.value - step)
+    end
+    if key == 39 or key == 38
+        return slider_set_value(slider, slider.value + step)
+    end
+    return 0
+end
+
+# Assigns a clamped slider value, firing `on_change` on movement.
+function slider_set_value(slider: Widget, v: int) -> int
+    let lo = slider.min_val
+    let hi = slider.max_val
+    if hi < lo
+        return 0
+    end
+    if v < lo
+        v = lo
+    end
+    if v > hi
+        v = hi
+    end
+    if v == slider.value
+        return 0
+    end
+    slider.value = v
+    widget_mark_dirty(slider)
+    if slider.on_change is not null
+        let cb = slider.on_change
+        cb(slider)
+    end
+    return 1
+end
+
+# Moves a dropdown/listview selection with Up/Down; returns 1 on change.
+function option_key(w: Widget, key: int) -> int
+    if w.options is null or len(w.options) == 0
+        return 0
+    end
+    let idx = w.value
+    if key == 38
+        idx -= 1
+    else
+        if key == 40
+            idx += 1
+        else
+            return 0
+        end
+    end
+    if idx < 0
+        idx = 0
+    end
+    if idx >= len(w.options)
+        idx = len(w.options) - 1
+    end
+    if idx == w.value
+        return 0
+    end
+    w.value = idx
+    widget_mark_dirty(w)
+    if w.on_change is not null
+        let cb = w.on_change
+        cb(w)
+    end
+    return 1
+end
+
+# Drops the last byte of a text input (ASCII-safe; IME compositions arrive
+# whole via `dispatch_text`). Fires `on_change`; returns 1 when applied.
+function textinput_backspace(w: Widget) -> int
+    let n = len(w.text)
+    if n <= 0
+        return 0
+    end
+    w.text = w.text[0..n - 1]
+    widget_mark_dirty(w)
+    if w.on_change is not null
+        let cb = w.on_change
+        cb(w)
+    end
+    return 1
+end
+
+# Appends committed text to an input; fires `on_change`; returns 1.
+function textinput_append(w: Widget, text: string) -> int
+    if text is null or text == ""
+        return 0
+    end
+    w.text = w.text + text
+    widget_mark_dirty(w)
+    if w.on_change is not null
+        let cb = w.on_change
+        cb(w)
+    end
+    return 1
+end

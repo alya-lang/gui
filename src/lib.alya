@@ -9,6 +9,7 @@ import "./types.alya"
 import "./core/geometry.alya"
 import "./core/backend.alya"
 import "./core/events.alya"
+import "./core/input.alya"
 import "./core/state.alya"
 import "./core/layout.alya"
 import "./core/raster.alya"
@@ -17,6 +18,7 @@ import "./canvas/surface.alya"
 import "./widgets/node.alya"
 import "./widgets/controls.alya"
 import "./widgets/containers.alya"
+import "./native/window.alya"
 import "./ffi.alya"
 
 ## Creates a window configuration with validated dimensions.
@@ -190,6 +192,121 @@ end
 ## Dispatches a point click over a widget tree (see `dispatch_click`).
 pub function click(root: Widget, x: int, y: int) -> int
     return dispatch_click(root, x, y)
+end
+
+## Creates empty mouse/keyboard input state (see `input_new`).
+pub function input() -> InputState
+    return input_new()
+end
+
+## Routes mouse motion, updating hover (see `dispatch_mouse_move`).
+pub function mouse_move(st: InputState, root: Widget, x: int, y: int) -> int
+    return dispatch_mouse_move(st, root, x, y)
+end
+
+## Routes a mouse press, arming click + focus (see `dispatch_mouse_down`).
+pub function mouse_down(st: InputState, root: Widget, x: int, y: int) -> int
+    return dispatch_mouse_down(st, root, x, y)
+end
+
+## Routes a mouse release, activating on press-widget release (see `dispatch_mouse_up`).
+pub function mouse_up(st: InputState, root: Widget, x: int, y: int) -> int
+    return dispatch_mouse_up(st, root, x, y)
+end
+
+## Routes a key press to the focused widget (see `dispatch_key`).
+pub function key_press(st: InputState, root: Widget, key: int) -> int
+    return dispatch_key(st, root, key)
+end
+
+## Routes committed text to the focused input (see `dispatch_text`).
+pub function text_enter(st: InputState, root: Widget, text: string) -> int
+    return dispatch_text(st, root, text)
+end
+
+## Applies one queued event to the tree (see `dispatch_event`).
+pub function apply_event(st: InputState, root: Widget, ev: GuiEvent) -> int
+    return dispatch_event(st, root, ev)
+end
+
+## Focuses a widget by id (see `input_focus`).
+pub function focus_widget(st: InputState, root: Widget, id: string) -> int
+    return input_focus(st, root, id)
+end
+
+## Maps a widget kind to its cursor style (see `cursor_for`).
+pub function cursor(kind: string) -> string
+    return cursor_for(kind)
+end
+
+## Opens a native OS window; null when headless (see `native_window_open`).
+pub function native_open(title: string, width: int, height: int)
+    return native_window_open(title, width, height)
+end
+
+## Destroys a native window handle (null-safe, see `native_window_close_handle`).
+pub function native_destroy(win) -> int
+    return native_window_close_handle(win)
+end
+
+## Shows a native window (see `native_window_show`).
+pub function native_show(win) -> int
+    return native_window_show(win)
+end
+
+## Returns 1 while the native window is open (see `native_window_is_open`).
+pub function native_is_open(win) -> int
+    return native_window_is_open(win)
+end
+
+## Requests a graceful native close (see `native_window_request_close`).
+pub function native_request_close(win) -> int
+    return native_window_request_close(win)
+end
+
+## Resizes the native window client area (see `native_window_resize`).
+pub function native_resize(win, width: int, height: int) -> int
+    return native_window_resize(win, width, height)
+end
+
+## Pumps one native event; returns its kind (see `native_window_poll`).
+pub function native_poll(win) -> int
+    return native_window_poll(win)
+end
+
+## Drains pending native events into `q` as records (see `native_window_drain`).
+pub function native_drain(win, q: GuiEventQueue) -> int
+    return native_window_drain(win, q)
+end
+
+## Last pumped event: client width (resize) in pixels.
+pub function native_event_width() -> int
+    return alya_gui_event_width()
+end
+
+## Last pumped event: client height.
+pub function native_event_height() -> int
+    return alya_gui_event_height()
+end
+
+## Last pumped event: mouse x.
+pub function native_event_mouse_x() -> int
+    return alya_gui_event_mouse_x()
+end
+
+## Last pumped event: mouse y.
+pub function native_event_mouse_y() -> int
+    return alya_gui_event_mouse_y()
+end
+
+## Last pumped event: key code (`0` when none).
+pub function native_event_key() -> int
+    return native_window_event_key()
+end
+
+## Last pumped `TextInput` event: UTF-8 text (`""` when none).
+pub function native_event_text() -> string
+    return native_window_event_text()
 end
 
 ## Stacks child sizes top-down inside a container (see `layout_vbox`).

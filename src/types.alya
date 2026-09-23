@@ -148,16 +148,20 @@ end
 ##
 ## ### Fields
 ## - `kind`: `GuiEventKind` value.
-## - `x`: Mouse x coordinate (mouse kinds).
-## - `y`: Mouse y coordinate (mouse kinds).
-## - `key`: Key code (keyboard kinds).
+## - `x`: Mouse x coordinate (mouse kinds); packed width (Resize kind).
+## - `y`: Mouse y coordinate (mouse kinds); packed height (Resize kind).
+## - `key`: Key code (keyboard kinds); focus flag (Focus kind).
 ## - `text`: Input text (TextInput kind).
+## - `w`: Client width (Resize kind).
+## - `h`: Client height (Resize kind).
 pub struct GuiEvent
     kind: int,
     x: int,
     y: int,
     key: int,
-    text: string
+    text: string,
+    w: int,
+    h: int
 end
 
 # ───────────────────────────────────────────────────────────────
@@ -215,8 +219,8 @@ pub function window_config_new(title: string = "Alya", width: int = 640, height:
 end
 
 ## Builds an event record with zeroed payload slots.
-pub function event_new(kind: int = 0, x: int = 0, y: int = 0, key: int = 0, text: string = "") -> GuiEvent
-    return GuiEvent { kind: kind, x: x, y: y, key: key, text: text }
+pub function event_new(kind: int = 0, x: int = 0, y: int = 0, key: int = 0, text: string = "", w: int = 0, h: int = 0) -> GuiEvent
+    return GuiEvent { kind: kind, x: x, y: y, key: key, text: text, w: w, h: h }
 end
 
 # ───────────────────────────────────────────────────────────────

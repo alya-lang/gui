@@ -1,0 +1,191 @@
+## Mouse/keyboard input dispatch tests for gui (Phase 3)
+## Part of the Alya Language package ecosystem (https://github.com/alya-lang)
+##
+## Headless event injection: hover, press/release pairing, focus routing,
+## per-widget keyboard handling, text editing, cursor mapping, and the
+## fiber/channel event-pump pattern from the roadmap (§3). No window opens.
+
+import "std/test"
+import "std/sync"
+import "../src/lib.alya" as pkg
+
+let clicked = []
+let changed = []
+
+function note_click(_w)
+    clicked.push("click")
+    return 1
+end
+
+function note_change(_w)
+    changed.push("change")
+    return 1
+end
+
+# Forwards up to `n` queued events into the channel (roadmap §3 pump:
+# native loop -> queue -> fiber -> Channel[GuiEvent]). Runs spawned.
+function forward_events(q, ch: Channel[int], n: int) -> int
+    let i = 0
+    while i < n
+        let ev = pkg::event_queue_poll(q)
+        if ev is null
+            break
+        end
+        ch.send(ev)
+        i += 1
+    end
+    return i
+end
+
+function main()
+    test_suite("gui Input Dispatch Tests")
+    let r = runner_new()
+
+    let root = pkg::widget("box", "root")
+    pkg::widget_set_rect(root, pkg::rect(0, 0, 200, 200))
+    let btn = pkg::button("ok", "OK")
+    pkg::widget_set_rect(btn, pkg::rect(10, 10, 80, 30))
+    pkg::widget_add_child(root, btn)
+    pkg::widget_on_click(btn, note_click)
+    let lab = pkg::label("title", "Title")
+    pkg::widget_set_rect(lab, pkg::rect(10, 50, 80, 20))
+    pkg::widget_add_child(root, lab)
+    let ti = pkg::textinput("name", "hi")
+    pkg::widget_set_rect(ti, pkg::rect(10, 80, 120, 24))
+    pkg::widget_add_child(root, ti)
+    pkg::widget_on_change(ti, note_change)
+
+    # 1. Hover tracking
+    let st = pkg::input()
+    runner_assert_str_eq(r, pkg::input_hovered(st), "", "no hover initially")
+    runner_assert_eq(r, pkg::mouse_move(st, root, 15, 15), 1, "hover changed onto button")
+    runner_assert_str_eq(r, pkg::input_hovered(st), "ok", "hover id")
+    runner_assert_eq(r, pkg::mouse_move(st, root, 16, 16), 0, "hover unchanged on same widget")
+    runner_assert_eq(r, pkg::mouse_move(st, root, 150, 150), 1, "hover changed to root")
+    runner_assert_str_eq(r, pkg::input_hovered(st), "root", "hover falls back to root")
+
+    # 2. Press/release pairing activates only on the pressed widget
+    runner_assert_eq(r, pkg::mouse_down(st, root, 15, 15), 1, "press hits button")
+    runner_assert_str_eq(r, pkg::input_focused(st), "ok", "press focuses button")
+    runner_assert_eq(r, pkg::mouse_up(st, root, 15, 15), 1, "release on button activates")
+    runner_assert_eq(r, len(clicked), 1, "click fired once")
+    runner_assert_eq(r, pkg::mouse_down(st, root, 15, 15), 1, "press again")
+    runner_assert_eq(r, pkg::mouse_up(st, root, 150, 150), 0, "release elsewhere cancels")
+    runner_assert_eq(r, len(clicked), 1, "no second click")
+    runner_assert_eq(r, pkg::mouse_down(st, root, 250, 250), 0, "press outside misses")
+    runner_assert_str_eq(r, pkg::input_focused(st), "", "miss blurs focus")
+
+    # 3. Focus management
+    runner_assert_eq(r, pkg::focus_widget(st, root, "name"), 1, "focus textinput by id")
+    runner_assert_str_eq(r, pkg::input_focused(st), "name", "focus id")
+    runner_assert_eq(r, pkg::focus_widget(st, root, "title"), 0, "label not focusable")
+    runner_assert_eq(r, pkg::focus_widget(st, root, "ghost"), 0, "missing id not focusable")
+    runner_assert_str_eq(r, pkg::input_focused(st), "name", "failed focus keeps old")
+    runner_assert_eq(r, pkg::key_press(st, root, 27), 1, "escape blurs")
+    runner_assert_str_eq(r, pkg::input_focused(st), "", "blurred")
+    runner_assert_eq(r, pkg::key_press(st, root, 13), 0, "key without focus ignored")
+
+    # 4. Keyboard activation: button via Enter, checkbox via Space
+    let cb = pkg::checkbox("agree", 0)
+    pkg::widget_set_rect(cb, pkg::rect(10, 110, 20, 20))
+    pkg::widget_add_child(root, cb)
+    pkg::widget_on_change(cb, note_change)
+    runner_assert_eq(r, pkg::mouse_down(st, root, 15, 15), 1, "press button for focus")
+    runner_assert_eq(r, pkg::key_press(st, root, 13), 1, "enter clicks focused button")
+    runner_assert_eq(r, len(clicked), 2, "keyboard click fired")
+    runner_assert_eq(r, pkg::key_press(st, root, 65), 0, "plain key not consumed by button")
+    runner_assert_eq(r, pkg::focus_widget(st, root, "agree"), 1, "focus checkbox")
+    runner_assert_eq(r, pkg::key_press(st, root, 32), 1, "space toggles checkbox")
+    runner_assert_eq(r, cb.value, 1, "checkbox checked")
+    runner_assert_eq(r, len(changed), 1, "checkbox change fired")
+
+    # 5. Slider arrows step the value
+    let sl = pkg::slider("vol", 0, 100, 50)
+    pkg::widget_set_rect(sl, pkg::rect(10, 140, 100, 20))
+    pkg::widget_add_child(root, sl)
+    pkg::widget_on_change(sl, note_change)
+    runner_assert_eq(r, pkg::focus_widget(st, root, "vol"), 1, "focus slider")
+    runner_assert_eq(r, pkg::key_press(st, root, 39), 1, "right steps up")
+    runner_assert_eq(r, sl.value, 60, "slider stepped to 60")
+    runner_assert_eq(r, pkg::key_press(st, root, 37), 1, "left steps down")
+    runner_assert_eq(r, sl.value, 50, "slider back to 50")
+    runner_assert_eq(r, pkg::key_press(st, root, 65), 0, "other key ignored by slider")
+
+    # 6. Dropdown/listview arrows move the selection
+    let dd = pkg::dropdown("theme", ["light", "dark", "auto"], 1)
+    pkg::widget_set_rect(dd, pkg::rect(120, 10, 70, 24))
+    pkg::widget_add_child(root, dd)
+    runner_assert_eq(r, pkg::focus_widget(st, root, "theme"), 1, "focus dropdown")
+    runner_assert_eq(r, pkg::key_press(st, root, 40), 1, "down moves selection")
+    runner_assert_eq(r, dd.value, 2, "dropdown at last option")
+    runner_assert_eq(r, pkg::key_press(st, root, 40), 0, "down at end is a no-op")
+    runner_assert_eq(r, pkg::key_press(st, root, 38), 1, "up moves back")
+    runner_assert_eq(r, dd.value, 1, "dropdown back to middle")
+    let lv = pkg::listview("files", ["a", "b"])
+    pkg::widget_set_rect(lv, pkg::rect(120, 40, 70, 40))
+    pkg::widget_add_child(root, lv)
+    runner_assert_eq(r, pkg::focus_widget(st, root, "files"), 1, "focus listview")
+    runner_assert_eq(r, pkg::key_press(st, root, 40), 1, "down selects first row")
+    runner_assert_eq(r, lv.value, 0, "list selection is 0")
+
+    # 7. Text editing: backspace, commit, committed text
+    runner_assert_eq(r, pkg::focus_widget(st, root, "name"), 1, "focus textinput")
+    runner_assert_eq(r, pkg::key_press(st, root, 8), 1, "backspace consumed")
+    runner_assert_str_eq(r, ti.text, "h", "backspace drops last byte")
+    runner_assert_eq(r, pkg::text_enter(st, root, "!"), 1, "committed text appended")
+    runner_assert_str_eq(r, ti.text, "h!", "text appended")
+    runner_assert_eq(r, pkg::widget_is_dirty(ti), 1, "edit marks dirty")
+    runner_assert_eq(r, pkg::key_press(st, root, 13), 1, "enter commits textinput")
+    runner_assert_eq(r, pkg::text_enter(st, root, ""), 0, "empty text ignored")
+    runner_assert_eq(r, pkg::focus_widget(st, root, "ok"), 1, "focus button")
+    runner_assert_eq(r, pkg::text_enter(st, root, "x"), 0, "text to non-input ignored")
+
+    # 8. Cursor mapping
+    runner_assert_str_eq(r, pkg::cursor("textinput"), "text", "editor cursor")
+    runner_assert_str_eq(r, pkg::cursor("textarea"), "text", "area cursor")
+    runner_assert_str_eq(r, pkg::cursor("button"), "pointer", "button cursor")
+    runner_assert_str_eq(r, pkg::cursor("slider"), "pointer", "slider cursor")
+    runner_assert_str_eq(r, pkg::cursor("label"), "arrow", "label cursor")
+    runner_assert_str_eq(r, pkg::cursor("box"), "arrow", "default cursor")
+
+    # 9. Queued event routing via dispatch_event
+    let st2 = pkg::input()
+    let clicks_before = len(clicked)
+    runner_assert_eq(r, pkg::apply_event(st2, root, pkg::event_new(pkg::GuiEventKind.MouseMove, 15, 15)), 1, "event move hovers")
+    runner_assert_eq(r, pkg::apply_event(st2, root, pkg::event_new(pkg::GuiEventKind.MouseDown, 15, 15)), 1, "event down presses")
+    runner_assert_eq(r, pkg::apply_event(st2, root, pkg::event_new(pkg::GuiEventKind.MouseUp, 15, 15)), 1, "event up clicks")
+    runner_assert_eq(r, len(clicked), clicks_before + 1, "event click fired")
+    runner_assert_eq(r, pkg::apply_event(st2, root, pkg::event_new(pkg::GuiEventKind.KeyDown, 0, 0, 13)), 1, "event key activates")
+    runner_assert_eq(r, len(clicked), clicks_before + 2, "event key click fired")
+    runner_assert_eq(r, pkg::focus_widget(st2, root, "name"), 1, "focus for text event")
+    runner_assert_eq(r, pkg::apply_event(st2, root, pkg::event_new(pkg::GuiEventKind.TextInput, 0, 0, 0, "yo")), 1, "event text applied")
+    runner_assert_eq(r, pkg::apply_event(st2, root, pkg::event_new(pkg::GuiEventKind.Focus, 0, 0, 0)), 1, "event focus-out blurs")
+    runner_assert_str_eq(r, pkg::input_focused(st2), "", "blurred by event")
+    runner_assert_eq(r, pkg::apply_event(st2, root, pkg::event_new(pkg::GuiEventKind.Close)), 0, "close only observed")
+    runner_assert_eq(r, pkg::apply_event(st2, root, pkg::event_new(pkg::GuiEventKind.Resize)), 0, "resize only observed")
+
+    # 10. Fiber/channel pump: queue -> spawned fiber -> Channel[GuiEvent]
+    let q = pkg::event_queue()
+    pkg::event_queue_push(q, pkg::event_new(pkg::GuiEventKind.MouseDown, 5, 6))
+    pkg::event_queue_push(q, pkg::event_new(pkg::GuiEventKind.KeyDown, 0, 0, 65))
+    pkg::event_queue_push(q, pkg::event_new(pkg::GuiEventKind.TextInput, 0, 0, 0, "z"))
+    let ch = Channel[int].new(capacity: 8)
+    spawn forward_events(q, ch, 3)
+    let e1 = ch.recv()
+    let e2 = ch.recv()
+    let e3 = ch.recv()
+    runner_assert_eq(r, e1.kind, pkg::GuiEventKind.MouseDown, "channel first kind")
+    runner_assert_eq(r, e1.x, 5, "channel first x")
+    runner_assert_eq(r, e2.kind, pkg::GuiEventKind.KeyDown, "channel second kind")
+    runner_assert_eq(r, e2.key, 65, "channel second key")
+    runner_assert_eq(r, e3.kind, pkg::GuiEventKind.TextInput, "channel third kind")
+    runner_assert_str_eq(r, e3.text, "z", "channel third text")
+    runner_assert_eq(r, pkg::event_queue_len(q), 0, "queue drained by fiber")
+
+    let failed = runner_summary(r)
+    if failed > 0
+        exit(1)
+    end
+end
+
+main()

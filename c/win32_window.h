@@ -6,19 +6,33 @@
 // Opaque native window handle (HWND on Windows).
 typedef struct alya_gui_window alya_gui_window_t;
 
-// Window event kinds pumped by alya_gui_window_poll.
+// Window/input event kinds pumped by alya_gui_window_poll.
+// Values mirror the Alya `GuiEventKind` enum one-to-one so the FFI layer
+// forwards kinds without translation (see `native_window_drain`).
 #define ALYA_GUI_EVENT_NONE 0
 #define ALYA_GUI_EVENT_CLOSE 1
 #define ALYA_GUI_EVENT_RESIZE 2
-#define ALYA_GUI_EVENT_PAINT 3
+#define ALYA_GUI_EVENT_MOUSE_MOVE 3
+#define ALYA_GUI_EVENT_MOUSE_DOWN 4
+#define ALYA_GUI_EVENT_MOUSE_UP 5
+#define ALYA_GUI_EVENT_KEY_DOWN 6
+#define ALYA_GUI_EVENT_KEY_UP 7
+#define ALYA_GUI_EVENT_TEXT_INPUT 8
+#define ALYA_GUI_EVENT_FOCUS 9
+#define ALYA_GUI_EVENT_REDRAW 10
 
-// Single pumped event: kind + client size + mouse position.
+// Single pumped event: kind + client size + mouse position + key code.
+// `key` carries the platform key code for KEY_DOWN/KEY_UP (Win32 VK,
+// Cocoa keyCode, X11 KeySym, Wayland evdev) and the focus flag (1/0)
+// for FOCUS. Printable text arrives via TEXT_INPUT; the UTF-8 payload
+// lives in a static stash, see `alya_gui_event_text`.
 typedef struct alya_gui_event {
     int32_t kind;
     int32_t width;
     int32_t height;
     int32_t mouse_x;
     int32_t mouse_y;
+    int32_t key;
 } alya_gui_event_t;
 
 // Creates a top-level window (title is UTF-8). Returns NULL on failure.
@@ -61,5 +75,9 @@ int32_t alya_gui_event_width(void);
 int32_t alya_gui_event_height(void);
 int32_t alya_gui_event_mouse_x(void);
 int32_t alya_gui_event_mouse_y(void);
+int32_t alya_gui_event_key(void);
+// UTF-8 text of the stashed TEXT_INPUT event ("" when none). The pointer
+// stays valid until the next poll; copy it before pumping again.
+const char *alya_gui_event_text(void);
 
 #endif

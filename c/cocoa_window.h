@@ -13,7 +13,14 @@ typedef struct alya_gui_window alya_gui_window_t;
 #define ALYA_GUI_EVENT_NONE 0
 #define ALYA_GUI_EVENT_CLOSE 1
 #define ALYA_GUI_EVENT_RESIZE 2
-#define ALYA_GUI_EVENT_PAINT 3
+#define ALYA_GUI_EVENT_MOUSE_MOVE 3
+#define ALYA_GUI_EVENT_MOUSE_DOWN 4
+#define ALYA_GUI_EVENT_MOUSE_UP 5
+#define ALYA_GUI_EVENT_KEY_DOWN 6
+#define ALYA_GUI_EVENT_KEY_UP 7
+#define ALYA_GUI_EVENT_TEXT_INPUT 8
+#define ALYA_GUI_EVENT_FOCUS 9
+#define ALYA_GUI_EVENT_REDRAW 10
 
 typedef struct alya_gui_event {
     int32_t kind;
@@ -21,6 +28,7 @@ typedef struct alya_gui_event {
     int32_t height;
     int32_t mouse_x;
     int32_t mouse_y;
+    int32_t key;
 } alya_gui_event_t;
 
 alya_gui_window_t *alya_gui_window_create(const char *title, int32_t width,
@@ -40,5 +48,7 @@ int32_t alya_gui_event_width(void);
 int32_t alya_gui_event_height(void);
 int32_t alya_gui_event_mouse_x(void);
 int32_t alya_gui_event_mouse_y(void);
+int32_t alya_gui_event_key(void);
+const char *alya_gui_event_text(void);
 
 #endif

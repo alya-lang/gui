@@ -31,17 +31,70 @@ static const wchar_t *alya_gui_class_name(void) {
     return L"AlyaGuiWindow";
 }
 
-static void alya_gui_push_event(alya_gui_window_t *win, int32_t kind) {
+static void alya_gui_push_event(alya_gui_window_t *win, int32_t kind,
+                                int32_t key) {
     int32_t next = (win->tail + 1) % ALYA_GUI_MAX_EVENTS;
     if (next == win->head) {
         return; // queue full: drop oldest policy would go here; drop newest
+    }
+    // Coalesce mouse-motion floods: a trailing unconsumed MOUSE_MOVE is
+    // refreshed in place so drags cannot starve clicks/keys.
+    if (kind == ALYA_GUI_EVENT_MOUSE_MOVE && win->head != win->tail) {
+        int32_t last = (win->tail + ALYA_GUI_MAX_EVENTS - 1) % ALYA_GUI_MAX_EVENTS;
+        if (win->queue[last].kind == ALYA_GUI_EVENT_MOUSE_MOVE) {
+            win->queue[last].width = win->width;
+            win->queue[last].height = win->height;
+            win->queue[last].mouse_x = win->mouse_x;
+            win->queue[last].mouse_y = win->mouse_y;
+            return;
+        }
     }
     win->queue[win->tail].kind = kind;
     win->queue[win->tail].width = win->width;
     win->queue[win->tail].height = win->height;
     win->queue[win->tail].mouse_x = win->mouse_x;
     win->queue[win->tail].mouse_y = win->mouse_y;
+    win->queue[win->tail].key = key;
     win->tail = next;
+}
+
+// UTF-8 stash for the latest TEXT_INPUT payload (truncated, NUL-terminated).
+#define ALYA_GUI_TEXT_STASH 128
+static char alya_gui_text_stash[ALYA_GUI_TEXT_STASH];
+
+static void alya_gui_set_text(const char *utf8, size_t len) {
+    size_t n;
+    if (utf8 == NULL || len == 0) {
+        alya_gui_text_stash[0] = '\0';
+        return;
+    }
+    n = len < ALYA_GUI_TEXT_STASH - 1 ? len : ALYA_GUI_TEXT_STASH - 1;
+    memcpy(alya_gui_text_stash, utf8, n);
+    alya_gui_text_stash[n] = '\0';
+}
+
+// Encodes one code point as UTF-8; returns the byte count (1-4).
+static int alya_gui_utf8_encode(char *out, unsigned cp) {
+    if (cp < 0x80) {
+        out[0] = (char)cp;
+        return 1;
+    }
+    if (cp < 0x800) {
+        out[0] = (char)(0xC0 | (cp >> 6));
+        out[1] = (char)(0x80 | (cp & 0x3F));
+        return 2;
+    }
+    if (cp < 0x10000) {
+        out[0] = (char)(0xE0 | (cp >> 12));
+        out[1] = (char)(0x80 | ((cp >> 6) & 0x3F));
+        out[2] = (char)(0x80 | (cp & 0x3F));
+        return 3;
+    }
+    out[0] = (char)(0xF0 | (cp >> 18));
+    out[1] = (char)(0x80 | ((cp >> 12) & 0x3F));
+    out[2] = (char)(0x80 | ((cp >> 6) & 0x3F));
+    out[3] = (char)(0x80 | (cp & 0x3F));
+    return 4;
 }
 
 static LRESULT CALLBACK alya_gui_wndproc(HWND hwnd, UINT msg, WPARAM wparam,
@@ -60,14 +113,14 @@ static LRESULT CALLBACK alya_gui_wndproc(HWND hwnd, UINT msg, WPARAM wparam,
     switch (msg) {
     case WM_CLOSE:
         win->open = 0;
-        alya_gui_push_event(win, ALYA_GUI_EVENT_CLOSE);
+        alya_gui_push_event(win, ALYA_GUI_EVENT_CLOSE, 0);
         return 0;
     case WM_SIZE: {
         RECT rc;
         if (GetClientRect(hwnd, &rc)) {
             win->width = (int32_t)(rc.right - rc.left);
             win->height = (int32_t)(rc.bottom - rc.top);
-            alya_gui_push_event(win, ALYA_GUI_EVENT_RESIZE);
+            alya_gui_push_event(win, ALYA_GUI_EVENT_RESIZE, 0);
         }
         return 0;
     }
@@ -75,12 +128,70 @@ static LRESULT CALLBACK alya_gui_wndproc(HWND hwnd, UINT msg, WPARAM wparam,
         PAINTSTRUCT ps;
         BeginPaint(hwnd, &ps);
         EndPaint(hwnd, &ps);
-        alya_gui_push_event(win, ALYA_GUI_EVENT_PAINT);
+        alya_gui_push_event(win, ALYA_GUI_EVENT_REDRAW, 0);
         return 0;
     }
     case WM_MOUSEMOVE:
         win->mouse_x = (int32_t)(int16_t)LOWORD(lparam);
         win->mouse_y = (int32_t)(int16_t)HIWORD(lparam);
+        alya_gui_push_event(win, ALYA_GUI_EVENT_MOUSE_MOVE, 0);
+        return 0;
+    case WM_LBUTTONDOWN:
+        win->mouse_x = (int32_t)(int16_t)LOWORD(lparam);
+        win->mouse_y = (int32_t)(int16_t)HIWORD(lparam);
+        SetCapture(hwnd);
+        alya_gui_push_event(win, ALYA_GUI_EVENT_MOUSE_DOWN, 0);
+        return 0;
+    case WM_LBUTTONUP:
+        win->mouse_x = (int32_t)(int16_t)LOWORD(lparam);
+        win->mouse_y = (int32_t)(int16_t)HIWORD(lparam);
+        ReleaseCapture();
+        alya_gui_push_event(win, ALYA_GUI_EVENT_MOUSE_UP, 0);
+        return 0;
+    case WM_KEYDOWN:
+    case WM_SYSKEYDOWN:
+        // Repeat counts arrive as separate messages; each is an event.
+        // `key` is the virtual-key code (VK_*); printable text follows
+        // via WM_CHAR so layouts/IME stay correct.
+        alya_gui_push_event(win, ALYA_GUI_EVENT_KEY_DOWN,
+                            (int32_t)wparam);
+        return 0;
+    case WM_KEYUP:
+    case WM_SYSKEYUP:
+        alya_gui_push_event(win, ALYA_GUI_EVENT_KEY_UP, (int32_t)wparam);
+        return 0;
+    case WM_CHAR: {
+        // UTF-16 code unit (surrogate pairs arrive as two messages).
+        static unsigned alya_gui_high = 0;
+        unsigned unit = (unsigned)wparam;
+        unsigned cp;
+        char utf8[4];
+        int n;
+        if (unit >= 0xD800 && unit <= 0xDBFF) {
+            alya_gui_high = unit;
+            return 0;
+        }
+        if (unit >= 0xDC00 && unit <= 0xDFFF && alya_gui_high != 0) {
+            cp = 0x10000 + ((alya_gui_high - 0xD800) << 10) +
+                 (unit - 0xDC00);
+            alya_gui_high = 0;
+        } else {
+            alya_gui_high = 0;
+            cp = unit;
+        }
+        if (cp < 0x20 || cp == 0x7F) {
+            return 0; // control characters are not text input
+        }
+        n = alya_gui_utf8_encode(utf8, cp);
+        alya_gui_set_text(utf8, (size_t)n);
+        alya_gui_push_event(win, ALYA_GUI_EVENT_TEXT_INPUT, (int32_t)cp);
+        return 0;
+    }
+    case WM_SETFOCUS:
+        alya_gui_push_event(win, ALYA_GUI_EVENT_FOCUS, 1);
+        return 0;
+    case WM_KILLFOCUS:
+        alya_gui_push_event(win, ALYA_GUI_EVENT_FOCUS, 0);
         return 0;
     case WM_DESTROY:
         win->open = 0;
@@ -259,7 +370,7 @@ void alya_gui_window_close(alya_gui_window_t *win) {
     PostMessageW(win->hwnd, WM_CLOSE, 0, 0);
 }
 
-static alya_gui_event_t alya_gui_stashed = {0, 0, 0, 0, 0};
+static alya_gui_event_t alya_gui_stashed = {0, 0, 0, 0, 0, 0};
 
 int32_t alya_gui_window_poll_event(alya_gui_window_t *win) {
     alya_gui_stashed.kind = 0;
@@ -267,6 +378,8 @@ int32_t alya_gui_window_poll_event(alya_gui_window_t *win) {
     alya_gui_stashed.height = 0;
     alya_gui_stashed.mouse_x = 0;
     alya_gui_stashed.mouse_y = 0;
+    alya_gui_stashed.key = 0;
+    alya_gui_text_stash[0] = '\0';
     if (win == NULL) {
         return 0;
     }
@@ -290,6 +403,14 @@ int32_t alya_gui_event_mouse_x(void) {
 
 int32_t alya_gui_event_mouse_y(void) {
     return alya_gui_stashed.mouse_y;
+}
+
+int32_t alya_gui_event_key(void) {
+    return alya_gui_stashed.key;
+}
+
+const char *alya_gui_event_text(void) {
+    return alya_gui_text_stash;
 }
 
 void alya_gui_window_size(alya_gui_window_t *win, int32_t *w, int32_t *h) {

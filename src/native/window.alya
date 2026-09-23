@@ -1,8 +1,13 @@
 ## gui/native/window — native window FFI (Windows backend, Phase 1)
 ##
 ## Part of the Alya Language package ecosystem (https://github.com/alya-lang).
-## Thin bindings over `c/win32_window.c`. Window handles are opaque pointers;
-## events arrive as small integers so no struct marshaling is needed.
+## Thin bindings over the per-OS C backends (`c/win32_window.c`,
+## `c/cocoa_window.c`, `c/linux_window.c` share one contract). Window
+## handles are opaque pointers; events arrive as small integers plus a
+## short UTF-8 text stash, so no struct marshaling is needed.
+
+import "../types.alya"
+import "../core/events.alya"
 
 extern "C"
     function alya_gui_window_create(title: str, width: i32, height: i32) -> ptr
@@ -18,6 +23,8 @@ extern "C"
     function alya_gui_event_height() -> i32
     function alya_gui_event_mouse_x() -> i32
     function alya_gui_event_mouse_y() -> i32
+    function alya_gui_event_key() -> i32
+    function alya_gui_event_text() -> str
 end
 
 ## Opens a native window; returns null when creation fails.
@@ -67,9 +74,58 @@ pub function native_window_resize(win, width: int, height: int) -> int
 end
 
 ## Pumps once; returns the event kind (`0` = none, `1` = close, ...).
+##
+## Native kinds mirror `GuiEventKind` one-to-one (see `native_window_drain`).
 pub function native_window_poll(win) -> int
     if win is null
         return 0
     end
     return alya_gui_window_poll_event(win)
+end
+
+## Reads the key code of the last pumped event (`0` when none).
+pub function native_window_event_key() -> int
+    return alya_gui_event_key()
+end
+
+## Reads the UTF-8 text of the last pumped `TextInput` event (`""` when none).
+pub function native_window_event_text() -> string
+    let t = alya_gui_event_text()
+    if t is null
+        return ""
+    end
+    return t
+end
+
+## Drains all pending native events into `q` as `GuiEvent` records.
+##
+## Kinds pass through unchanged (native `GuiEventKind` mirror); Resize
+## carries the client size in `w`/`h`, mouse kinds the position in `x`/`y`,
+## keyboard kinds the platform code in `key`, `TextInput` its UTF-8 text.
+## Returns the event count drained (`0` for null handles/queues).
+pub function native_window_drain(win, q: GuiEventQueue) -> int
+    if win is null or q is null
+        return 0
+    end
+    let n = 0
+    while n < 64
+        let kind = alya_gui_window_poll_event(win)
+        if kind == 0
+            break
+        end
+        let text = ""
+        if kind == GuiEventKind.TextInput
+            text = native_window_event_text()
+        end
+        let ev = event_new(kind)
+        ev.x = alya_gui_event_mouse_x()
+        ev.y = alya_gui_event_mouse_y()
+        ev.key = alya_gui_event_key()
+        ev.text = text
+        ev.w = alya_gui_event_width()
+        ev.h = alya_gui_event_height()
+        event_queue_push(q, ev)
+        n += 1
+    end
+    return n
 end

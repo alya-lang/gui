@@ -66,7 +66,8 @@ struct alya_gui_window {
     Atom xwm_delete;
 };
 
-static void alya_gui_push_event(alya_gui_window_t *win, int32_t kind) {
+static void alya_gui_push_event(alya_gui_window_t *win, int32_t kind,
+                                int32_t key) {
     int32_t next;
     if (win == NULL) {
         return;
@@ -75,15 +76,43 @@ static void alya_gui_push_event(alya_gui_window_t *win, int32_t kind) {
     if (next == win->head) {
         return;
     }
+    // Coalesce mouse-motion floods: a trailing unconsumed MOUSE_MOVE is
+    // refreshed in place so drags cannot starve clicks/keys.
+    if (kind == ALYA_GUI_EVENT_MOUSE_MOVE && win->head != win->tail) {
+        int32_t last = (win->tail + ALYA_GUI_MAX_EVENTS - 1) % ALYA_GUI_MAX_EVENTS;
+        if (win->queue[last].kind == ALYA_GUI_EVENT_MOUSE_MOVE) {
+            win->queue[last].width = win->width;
+            win->queue[last].height = win->height;
+            win->queue[last].mouse_x = win->mouse_x;
+            win->queue[last].mouse_y = win->mouse_y;
+            return;
+        }
+    }
     win->queue[win->tail].kind = kind;
     win->queue[win->tail].width = win->width;
     win->queue[win->tail].height = win->height;
     win->queue[win->tail].mouse_x = win->mouse_x;
     win->queue[win->tail].mouse_y = win->mouse_y;
+    win->queue[win->tail].key = key;
     win->tail = next;
 }
 
-static alya_gui_event_t alya_gui_stashed = {0, 0, 0, 0, 0};
+static alya_gui_event_t alya_gui_stashed = {0, 0, 0, 0, 0, 0};
+
+// UTF-8 stash for the latest TEXT_INPUT payload (truncated, NUL-terminated).
+#define ALYA_GUI_TEXT_STASH 128
+static char alya_gui_text_stash[ALYA_GUI_TEXT_STASH];
+
+static void alya_gui_set_text(const char *utf8, size_t len) {
+    size_t n;
+    if (utf8 == NULL || len == 0) {
+        alya_gui_text_stash[0] = '\0';
+        return;
+    }
+    n = len < ALYA_GUI_TEXT_STASH - 1 ? len : ALYA_GUI_TEXT_STASH - 1;
+    memcpy(alya_gui_text_stash, utf8, n);
+    alya_gui_text_stash[n] = '\0';
+}
 
 // --- Wayland wire helpers ---
 // --- Wire helpers (all integers little-endian on supported targets) ---
@@ -262,13 +291,13 @@ static void wl_handle(alya_gui_window_t *win, uint32_t obj,
             if (w > 0 && h > 0 && (w != win->width || h != win->height)) {
                 win->width = w;
                 win->height = h;
-                alya_gui_push_event(win, ALYA_GUI_EVENT_RESIZE);
+                alya_gui_push_event(win, ALYA_GUI_EVENT_RESIZE, 0);
             }
         }
     } else if (obj == win->wl_toplevel_id && opcode == 1) {
         // xdg_toplevel close.
         win->open = 0;
-        alya_gui_push_event(win, ALYA_GUI_EVENT_CLOSE);
+        alya_gui_push_event(win, ALYA_GUI_EVENT_CLOSE, 0);
     } else if (obj == win->wl_seat_id && opcode == 0) {
         // seat capabilities: bit 0 = pointer, bit 1 = keyboard.
         if (body_len >= 4) {
@@ -279,7 +308,12 @@ static void wl_handle(alya_gui_window_t *win, uint32_t obj,
                     win->wl_pointer_id = id;
                 }
             }
-            // Keyboard binding is deferred to Phase 3 input work.
+            if ((caps & 2) && win->wl_keyboard_id == 0) {
+                uint32_t id = wl_new_id(win);
+                if (wl_req(win, win->wl_seat_id, 1, &id, 1) == 0) {
+                    win->wl_keyboard_id = id;
+                }
+            }
         }
     } else if (obj == win->wl_pointer_id && opcode == 2) {
         // pointer motion: time u32, surface_x fixed, surface_y fixed.
@@ -288,12 +322,33 @@ static void wl_handle(alya_gui_window_t *win, uint32_t obj,
             int32_t fy = (int32_t)alya_rd32(body + 8);
             win->mouse_x = fx >> 8;
             win->mouse_y = fy >> 8;
+            alya_gui_push_event(win, ALYA_GUI_EVENT_MOUSE_MOVE, 0);
         }
     } else if (obj == win->wl_pointer_id && opcode == 3) {
         // pointer button: serial, time, button, state (pressed = 1).
+        // Coords come from the last motion event (buttons carry none).
         if (body_len >= 16) {
             uint32_t state = alya_rd32(body + 12);
-            (void)state;
+            if (state == 1) {
+                alya_gui_push_event(win, ALYA_GUI_EVENT_MOUSE_DOWN, 0);
+            } else {
+                alya_gui_push_event(win, ALYA_GUI_EVENT_MOUSE_UP, 0);
+            }
+        }
+    } else if (obj == win->wl_keyboard_id && opcode == 3) {
+        // keyboard key: serial, time, key (evdev code), state (1 = pressed).
+        // Text composition needs the input-method protocol (Phase 6);
+        // printable text arrives on backends with OS text services.
+        if (body_len >= 16) {
+            uint32_t key = alya_rd32(body + 8);
+            uint32_t state = alya_rd32(body + 12);
+            if (state == 1) {
+                alya_gui_push_event(win, ALYA_GUI_EVENT_KEY_DOWN,
+                                    (int32_t)key);
+            } else {
+                alya_gui_push_event(win, ALYA_GUI_EVENT_KEY_UP,
+                                    (int32_t)key);
+            }
         }
     }
 }
@@ -600,7 +655,8 @@ static alya_gui_window_t *x11_window_create(const char *title, int32_t width,
     }
     XSelectInput(display, window,
                  ExposureMask | StructureNotifyMask | PointerMotionMask |
-                     ButtonPressMask | KeyPressMask | KeyReleaseMask);
+                     ButtonPressMask | ButtonReleaseMask | KeyPressMask |
+                     KeyReleaseMask | FocusChangeMask);
     win->active = ALYA_GUI_LINUX_X11;
     win->open = 1;
     win->width = width;
@@ -657,7 +713,7 @@ static int32_t x11_window_poll(alya_gui_window_t *win, alya_gui_event_t *out) {
         case ClientMessage:
             if ((Atom)ev.xclient.data.l[0] == win->xwm_delete) {
                 win->open = 0;
-                alya_gui_push_event(win, ALYA_GUI_EVENT_CLOSE);
+                alya_gui_push_event(win, ALYA_GUI_EVENT_CLOSE, 0);
             }
             break;
         case ConfigureNotify:
@@ -665,17 +721,55 @@ static int32_t x11_window_poll(alya_gui_window_t *win, alya_gui_event_t *out) {
                 ev.xconfigure.height != win->height) {
                 win->width = ev.xconfigure.width;
                 win->height = ev.xconfigure.height;
-                alya_gui_push_event(win, ALYA_GUI_EVENT_RESIZE);
+                alya_gui_push_event(win, ALYA_GUI_EVENT_RESIZE, 0);
             }
             break;
         case Expose:
             if (ev.xexpose.count == 0) {
-                alya_gui_push_event(win, ALYA_GUI_EVENT_PAINT);
+                alya_gui_push_event(win, ALYA_GUI_EVENT_REDRAW, 0);
             }
             break;
         case MotionNotify:
             win->mouse_x = ev.xmotion.x;
             win->mouse_y = ev.xmotion.y;
+            alya_gui_push_event(win, ALYA_GUI_EVENT_MOUSE_MOVE, 0);
+            break;
+        case ButtonPress:
+            win->mouse_x = ev.xbutton.x;
+            win->mouse_y = ev.xbutton.y;
+            alya_gui_push_event(win, ALYA_GUI_EVENT_MOUSE_DOWN, 0);
+            break;
+        case ButtonRelease:
+            win->mouse_x = ev.xbutton.x;
+            win->mouse_y = ev.xbutton.y;
+            alya_gui_push_event(win, ALYA_GUI_EVENT_MOUSE_UP, 0);
+            break;
+        case KeyPress:
+        case KeyRelease: {
+            // KeySym identifies the key (layout-dependent); printable text
+            // additionally arrives via XLookupString (no IME here).
+            KeySym sym = XLookupKeysym(&ev.xkey, 0);
+            if (ev.type == KeyPress) {
+                char text[64];
+                int n = XLookupString(&ev.xkey, text, (int)sizeof(text) - 1,
+                                      NULL, NULL);
+                alya_gui_push_event(win, ALYA_GUI_EVENT_KEY_DOWN,
+                                    (int32_t)sym);
+                if (n > 0 && (unsigned char)text[0] >= 0x20) {
+                    alya_gui_set_text(text, (size_t)n);
+                    alya_gui_push_event(win, ALYA_GUI_EVENT_TEXT_INPUT, 0);
+                }
+            } else {
+                alya_gui_push_event(win, ALYA_GUI_EVENT_KEY_UP,
+                                    (int32_t)sym);
+            }
+            break;
+        }
+        case FocusIn:
+            alya_gui_push_event(win, ALYA_GUI_EVENT_FOCUS, 1);
+            break;
+        case FocusOut:
+            alya_gui_push_event(win, ALYA_GUI_EVENT_FOCUS, 0);
             break;
         default:
             break;
@@ -886,7 +980,7 @@ static void wl_window_close(alya_gui_window_t *win) {
         return;
     }
     win->open = 0;
-    alya_gui_push_event(win, ALYA_GUI_EVENT_CLOSE);
+    alya_gui_push_event(win, ALYA_GUI_EVENT_CLOSE, 0);
 }
 
 // --- Public API: runtime backend dispatch ---
@@ -1001,7 +1095,10 @@ int32_t alya_gui_window_poll_event(alya_gui_window_t *win) {
     alya_gui_stashed.height = 0;
     alya_gui_stashed.mouse_x = 0;
     alya_gui_stashed.mouse_y = 0;
+    alya_gui_stashed.key = 0;
+    alya_gui_text_stash[0] = '\0';
     if (win == NULL) {
+        return 0;
         return 0;
     }
     if (alya_gui_window_poll(win, &alya_gui_stashed) == 0) {
@@ -1036,4 +1133,12 @@ int32_t alya_gui_event_mouse_x(void) {
 
 int32_t alya_gui_event_mouse_y(void) {
     return alya_gui_stashed.mouse_y;
+}
+
+int32_t alya_gui_event_key(void) {
+    return alya_gui_stashed.key;
+}
+
+const char *alya_gui_event_text(void) {
+    return alya_gui_text_stash;
 }

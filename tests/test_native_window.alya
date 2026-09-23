@@ -1,11 +1,10 @@
-## Native window tests for gui (Windows backend, Phase 1)
+## Native window tests for gui (Phase 1 windowing + Phase 3 input pump)
 ## Part of the Alya Language package ecosystem (https://github.com/alya-lang)
 ##
-## Real OS windows: skipped (passing) on non-Windows runners.
+## Real OS windows: skipped (passing) on headless runners.
 
 import "std/test"
 import "../src/lib.alya" as pkg
-import "../src/native/window.alya" as nat
 
 function main()
     test_suite("gui Native Window Tests")
@@ -21,7 +20,7 @@ function main()
     end
 
     # 1. Create (hidden) + liveness (null = headless, skip passing)
-    let win = nat::native_window_open("Alya CI Probe", 320, 200)
+    let win = pkg::native_open("Alya CI Probe", 320, 200)
     if win is null
         runner_assert(r, 1 == 1, "no display, skipped")
         let done0 = runner_summary(r)
@@ -30,51 +29,73 @@ function main()
         end
         return
     end
-    runner_assert_eq(r, nat::native_window_is_open(win), 1, "window open")
+    runner_assert_eq(r, pkg::native_is_open(win), 1, "window open")
 
     # 2. Show + pump (drains any initial paint/resize noise)
-    runner_assert_eq(r, nat::native_window_show(win), 1, "show returns 1")
+    runner_assert_eq(r, pkg::native_show(win), 1, "show returns 1")
     let i = 0
     while i < 20
-        nat::native_window_poll(win)
+        pkg::native_poll(win)
         i += 1
     end
-    runner_assert_eq(r, nat::native_window_is_open(win), 1, "still open")
+    runner_assert_eq(r, pkg::native_is_open(win), 1, "still open")
 
     # 3. Resize flows through a RESIZE event with the new size
-    runner_assert_eq(r, nat::native_window_resize(win, 400, 300), 1, "resize requested")
+    runner_assert_eq(r, pkg::native_resize(win, 400, 300), 1, "resize requested")
     let rkind = 0
     let rticks = 0
     while rticks < 100
-        rkind = nat::native_window_poll(win)
+        rkind = pkg::native_poll(win)
         if rkind == 2
             break
         end
         rticks += 1
     end
     runner_assert_eq(r, rkind, 2, "RESIZE event pumped")
-    runner_assert_eq(r, nat::alya_gui_event_width(), 400, "resized width")
-    runner_assert_eq(r, nat::alya_gui_event_height(), 300, "resized height")
+    runner_assert_eq(r, pkg::native_event_width(), 400, "resized width")
+    runner_assert_eq(r, pkg::native_event_height(), 300, "resized height")
+
+    # 3b. Drain maps native events to GuiEvent records (size in w/h)
+    runner_assert_eq(r, pkg::native_resize(win, 420, 320), 1, "resize 2 requested")
+    let dq = pkg::event_queue()
+    let dfound = 0
+    let dticks = 0
+    while dticks < 200
+        pkg::native_drain(win, dq)
+        while pkg::event_queue_len(dq) > 0
+            let dev = pkg::event_queue_poll(dq)
+            if dev.kind == 2 and dev.w == 420 and dev.h == 320
+                dfound = 1
+            end
+        end
+        if dfound == 1
+            break
+        end
+        dticks += 1
+    end
+    runner_assert_eq(r, dfound, 1, "drain maps RESIZE with size")
 
     # 4. Graceful close -> CLOSE event -> not open
-    runner_assert_eq(r, nat::native_window_request_close(win), 1, "close requested")
+    runner_assert_eq(r, pkg::native_request_close(win), 1, "close requested")
     let kind = 0
     let ticks = 0
     while ticks < 100
-        kind = nat::native_window_poll(win)
+        kind = pkg::native_poll(win)
         if kind == 1
             break
         end
         ticks += 1
     end
     runner_assert_eq(r, kind, 1, "CLOSE event pumped")
-    runner_assert_eq(r, nat::native_window_is_open(win), 0, "closed after event")
+    runner_assert_eq(r, pkg::native_is_open(win), 0, "closed after event")
 
     # 4. Null safety
-    runner_assert_eq(r, nat::native_window_poll(null), 0, "poll null is 0")
-    runner_assert_eq(r, nat::native_window_is_open(null), 0, "is_open null is 0")
-    runner_assert_eq(r, nat::native_window_close_handle(null), 1, "destroy null safe")
-    nat::native_window_close_handle(win)
+    runner_assert_eq(r, pkg::native_poll(null), 0, "poll null is 0")
+    runner_assert_eq(r, pkg::native_drain(null, pkg::event_queue()), 0, "drain null win is 0")
+    runner_assert_eq(r, pkg::native_drain(win, null), 0, "drain null queue is 0")
+    runner_assert_eq(r, pkg::native_is_open(null), 0, "is_open null is 0")
+    runner_assert_eq(r, pkg::native_destroy(null), 1, "destroy null safe")
+    pkg::native_destroy(win)
 
     let failed = runner_summary(r)
     if failed > 0
