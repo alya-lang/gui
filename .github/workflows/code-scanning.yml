@@ -12,6 +12,12 @@ on:
     branches: [main]
   schedule:
     - cron: '0 4 * * 1' # Weekly on Monday at 04:00 UTC
+  workflow_dispatch:
+
+# Cancel superseded runs on rapid pushes to the same ref.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -37,3 +43,11 @@ jobs:
         with:
           sarif_file: alya-lint.sarif
           category: alya-lint
+
+      - name: Upload SARIF as debug artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: alya-lint-sarif
+          path: alya-lint.sarif
+          retention-days: 7
