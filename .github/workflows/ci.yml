@@ -39,7 +39,7 @@ jobs:
         uses: actions/checkout@v7
 
       - name: Install Linux X11 headers (X11 fallback backend)
-        if: matrix.os == 'ubuntu-latest'
+        if: startsWith(matrix.os, 'ubuntu')
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq libx11-dev
