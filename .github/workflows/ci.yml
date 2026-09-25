@@ -36,7 +36,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Install Linux X11 headers (X11 fallback backend)
         if: matrix.os == 'ubuntu-latest'
