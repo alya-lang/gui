@@ -8,6 +8,7 @@
 import "../types.alya"
 import "../core/raster.alya"
 import "../widgets/node.alya"
+@cfg(feature = "native")
 import "../native/window.alya"
 
 # Theme (0xRRGGBB).
@@ -343,6 +344,9 @@ end
 ## overlaying widget texts. `focus` draws the accent ring ("" = none),
 ## `pressed`/`hover` style pressed/hovered widgets ("" = none).
 ## Returns `1` when presented, `0` otherwise (null-safe).
+##
+## Requires the `native` feature (default-on).
+@cfg(feature = "native")
 pub function render_present(root: Widget, surf, w: int, h: int, focus: string = "", pressed: string = "", hover: string = "") -> int
     if root is null or surf is null or w <= 0 or h <= 0
         return 0

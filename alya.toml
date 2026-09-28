@@ -12,6 +12,10 @@ keywords = ["alya", "alya-lang", "package", "gui", "c", "ffi"]
 
 [dependencies]
 
+[features]
+default = ["native"]
+native = []
+
 [build]
 c-sources = ["c/gui.c"]
 c-sources-windows = ["c/win32_window.c", "c/d2d_surface.c"]

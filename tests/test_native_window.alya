@@ -6,6 +6,7 @@
 import "std/test"
 import "../src/lib.alya" as pkg
 
+@cfg(feature = "native")
 function main()
     test_suite("gui Native Window Tests")
     let r = runner_new()
@@ -115,6 +116,18 @@ function main()
     runner_assert_eq(r, pkg::native_destroy(null), 1, "destroy null safe")
     pkg::native_destroy(win)
 
+    let failed = runner_summary(r)
+    if failed > 0
+        exit(1)
+    end
+end
+
+# Native windowing needs the `native` feature: register an empty
+# suite so the file still compiles and passes in slim views.
+@cfg(not(feature = "native"))
+function main()
+    test_suite("gui Native Window Tests (skipped without native feature)")
+    let r = runner_new()
     let failed = runner_summary(r)
     if failed > 0
         exit(1)

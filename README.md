@@ -75,6 +75,25 @@ alya add gui --git https://github.com/alya-lang/gui --branch main
 alya install
 ```
 
+### Package Features
+
+| Feature | Default | Description |
+|:---|:---:|:---|
+| `native` | ✅ | Native OS windows, GPU surfaces, and event pumping (`native_*`, `gpu_*`, `render_tree`, `a11y_notify`). Without it layout, widgets, software canvas, and geometry remain (headless). |
+
+> [!NOTE]
+> The bundled C objects (`c/`) always compile regardless of features; the feature gates the Alya API surface and codegen. Slim builds still link the native library.
+
+```bash
+# Full build (default)
+alya install
+alya test
+
+# Slim headless build
+alya install --no-default-features
+alya test --no-default-features
+```
+
 ---
 
 ## 🚀 Quick Start

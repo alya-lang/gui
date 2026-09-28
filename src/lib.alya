@@ -19,6 +19,7 @@ import "./canvas/render.alya"
 import "./widgets/node.alya"
 import "./widgets/controls.alya"
 import "./widgets/containers.alya"
+@cfg(feature = "native")
 import "./native/window.alya"
 import "./ffi.alya"
 
@@ -263,6 +264,7 @@ end
 ## Fires one screen-reader notification for the bound window
 ## (`1` = focus, `2` = value, `3` = selection, `4` = state;
 ## see `native_a11y_notify`). Returns `1` when delivered.
+@cfg(feature = "native")
 pub function a11y_notify(win, code: int) -> int
     return native_a11y_notify(win, code)
 end
@@ -273,106 +275,127 @@ pub function cursor(kind: string) -> string
 end
 
 ## Opens a native OS window; null when headless (see `native_window_open`).
+@cfg(feature = "native")
 pub function native_open(title: string, width: int, height: int)
     return native_window_open(title, width, height)
 end
 
 ## Destroys a native window handle (null-safe, see `native_window_close_handle`).
+@cfg(feature = "native")
 pub function native_destroy(win) -> int
     return native_window_close_handle(win)
 end
 
 ## Shows a native window (see `native_window_show`).
+@cfg(feature = "native")
 pub function native_show(win) -> int
     return native_window_show(win)
 end
 
 ## Returns 1 while the native window is open (see `native_window_is_open`).
+@cfg(feature = "native")
 pub function native_is_open(win) -> int
     return native_window_is_open(win)
 end
 
 ## Requests a graceful native close (see `native_window_request_close`).
+@cfg(feature = "native")
 pub function native_request_close(win) -> int
     return native_window_request_close(win)
 end
 
 ## Resizes the native window client area (see `native_window_resize`).
+@cfg(feature = "native")
 pub function native_resize(win, width: int, height: int) -> int
     return native_window_resize(win, width, height)
 end
 
 ## Pumps one native event; returns its kind (see `native_window_poll`).
+@cfg(feature = "native")
 pub function native_poll(win) -> int
     return native_window_poll(win)
 end
 
 ## Drains pending native events into `q` as records (see `native_window_drain`).
+@cfg(feature = "native")
 pub function native_drain(win, q: GuiEventQueue) -> int
     return native_window_drain(win, q)
 end
 
 ## Last pumped event: client width (resize) in pixels.
+@cfg(feature = "native")
 pub function native_event_width() -> int
     return alya_gui_event_width()
 end
 
 ## Last pumped event: client height.
+@cfg(feature = "native")
 pub function native_event_height() -> int
     return alya_gui_event_height()
 end
 
 ## Last pumped event: mouse x.
+@cfg(feature = "native")
 pub function native_event_mouse_x() -> int
     return alya_gui_event_mouse_x()
 end
 
 ## Last pumped event: mouse y.
+@cfg(feature = "native")
 pub function native_event_mouse_y() -> int
     return alya_gui_event_mouse_y()
 end
 
 ## Last pumped event: key code (`0` when none).
+@cfg(feature = "native")
 pub function native_event_key() -> int
     return native_window_event_key()
 end
 
 ## Last pumped `TextInput` event: UTF-8 text (`""` when none).
+@cfg(feature = "native")
 pub function native_event_text() -> string
     return native_window_event_text()
 end
 
 ## Creates a GPU surface bound to a native window (see `native_gpu_create`).
+@cfg(feature = "native")
 pub function gpu_create(win, width: int, height: int)
     return native_gpu_create(win, width, height)
 end
 
 ## Destroys a GPU surface (see `native_gpu_destroy`).
+@cfg(feature = "native")
 pub function gpu_destroy(surf) -> int
     return native_gpu_destroy(surf)
 end
 
 ## Stages one XRGB pixel on a GPU surface (see `native_gpu_stage`).
+@cfg(feature = "native")
 pub function gpu_stage(surf, index: int, color: int) -> int
     return native_gpu_stage(surf, index, color)
 end
 
 ## Presents the staged GPU buffer (see `native_gpu_present`).
+@cfg(feature = "native")
 pub function gpu_present(surf) -> int
     return native_gpu_present(surf)
 end
 
 ## Rebuilds a GPU surface at a new size (see `native_gpu_resize`).
+@cfg(feature = "native")
 pub function gpu_resize(surf, width: int, height: int) -> int
     return native_gpu_resize(surf, width, height)
 end
 
 ## Draws UTF-8 text on a GPU surface (see `native_gpu_text`).
+@cfg(feature = "native")
 pub function gpu_text(surf, text: string, x: int, y: int, size_px: int, color: int) -> int
     return native_gpu_text(surf, text, x, y, size_px, color)
 end
 
 ## Paints a widget tree and presents it on a GPU surface (see `render_present`).
+@cfg(feature = "native")
 pub function render_tree(root: Widget, surf, w: int, h: int, focus: string = "", pressed: string = "", hover: string = "") -> int
     return render_present(root, surf, w, h, focus, pressed, hover)
 end
@@ -381,6 +404,7 @@ end
 ## surface image, then presents. The GPU surface must match the image
 ## dimensions (extra pixels are ignored, missing ones stay zeroed).
 ## Returns the staged pixel count, `0` when nothing was shown.
+@cfg(feature = "native")
 pub function gpu_blit(s: DrawSurface, surf) -> int
     if s is null or surf is null
         return 0
