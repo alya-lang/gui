@@ -19,20 +19,28 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, ubuntu-24.04-arm, windows-latest, windows-11-arm, macos-latest, macos-15-intel]
         include:
           - os: ubuntu-latest
             label: Linux x64
+            arch: ''
+          - os: ubuntu-latest
+            label: Linux x86
+            arch: x86
           - os: ubuntu-24.04-arm
             label: Linux ARM64
+            arch: ''
           - os: windows-latest
             label: Windows x64
+            arch: ''
           - os: windows-11-arm
             label: Windows ARM64
+            arch: ''
           - os: macos-latest
             label: macOS ARM64
+            arch: ''
           - os: macos-15-intel
             label: macOS Intel
+            arch: ''
 
     steps:
       - name: Checkout repository
@@ -48,6 +56,11 @@ jobs:
         uses: alya-lang/setup-alya@v1
         with:
           version: 'latest'
+          arch: ${{ matrix.arch }}
+
+      - name: Install 32-bit C toolchain (Linux x86 leg)
+        if: matrix.label == 'Linux x86'
+        run: sudo apt-get update && sudo apt-get install -y gcc-multilib libc6-i386
 
       - name: Verify alya installation
         run: |
@@ -110,7 +123,7 @@ jobs:
 
       - name: Upload documentation artifact
         uses: actions/upload-artifact@v7
-        if: matrix.os == 'ubuntu-latest'
+        if: matrix.label == 'Linux x64'
         with:
           name: api-docs
           path: docs/

@@ -29,7 +29,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Set up Alya
         uses: alya-lang/setup-alya@v1
@@ -45,7 +45,7 @@ jobs:
           category: alya-lint
 
       - name: Upload SARIF as debug artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: alya-lint-sarif
