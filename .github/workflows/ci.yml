@@ -22,25 +22,16 @@ jobs:
         include:
           - os: ubuntu-latest
             label: Linux x64
-            arch: ''
-          - os: ubuntu-latest
-            label: Linux x86
-            arch: x86
           - os: ubuntu-24.04-arm
             label: Linux ARM64
-            arch: ''
           - os: windows-latest
             label: Windows x64
-            arch: ''
           - os: windows-11-arm
             label: Windows ARM64
-            arch: ''
           - os: macos-latest
             label: macOS ARM64
-            arch: ''
           - os: macos-15-intel
             label: macOS Intel
-            arch: ''
 
     steps:
       - name: Checkout repository
@@ -56,11 +47,6 @@ jobs:
         uses: alya-lang/setup-alya@v1
         with:
           version: 'latest'
-          arch: ${{ matrix.arch }}
-
-      - name: Install 32-bit C toolchain (Linux x86 leg)
-        if: matrix.label == 'Linux x86'
-        run: sudo apt-get update && sudo apt-get install -y gcc-multilib libc6-i386
 
       - name: Verify alya installation
         run: |
