@@ -419,7 +419,7 @@ pub function gpu_blit(s: DrawSurface, surf) -> int
         n = n + native_gpu_stage(surf, i, px[i])
         i += 1
     end
-    if native_gpu_present(surf) == 0
+    if native_gpu_present(surf) == false
         return 0
     end
     return n

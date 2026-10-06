@@ -22,7 +22,7 @@ function main()
 
     # Pump until the user closes the window (or 30s at ~60Hz).
     let ticks = 0
-    while pkg::native_is_open(win) == 1 and ticks < 1800
+    while pkg::native_is_open(win) == true and ticks < 1800
         let kind = pkg::native_poll(win)
         if kind == pkg::GuiEventKind.Close
             break

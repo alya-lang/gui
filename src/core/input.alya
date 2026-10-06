@@ -62,15 +62,15 @@ end
 ## Returns 1 when `kind` can take keyboard focus.
 pub function input_is_focusable(kind: string) -> int
     if kind == "button" or kind == "textinput" or kind == "textarea"
-        return 1
+        return true
     end
     if kind == "checkbox" or kind == "radio" or kind == "slider"
-        return 1
+        return true
     end
     if kind == "dropdown" or kind == "listview"
-        return 1
+        return true
     end
-    return 0
+    return false
 end
 
 ## Moves focus to the widget `id` when it exists and is focusable.
@@ -79,27 +79,27 @@ end
 ## (focus is left unchanged).
 pub function input_focus(st: InputState, root: Widget, id: string) -> int
     if st is null or root is null or id is null or id == ""
-        return 0
+        return false
     end
     let target = widget_find(root, id)
-    if target is null or target.enabled == 0
-        return 0
+    if target is null or target.enabled == false
+        return false
     end
-    if input_is_focusable(target.kind) == 0
-        return 0
+    if input_is_focusable(target.kind) == false
+        return false
     end
     st.focus = id
-    return 1
+    return true
 end
 
 ## Clears keyboard focus; returns `1`.
 pub function input_blur(st: InputState) -> int
     if st is null
-        return 0
+        return false
     end
     st.focus = ""
     st.composing = ""
-    return 1
+    return true
 end
 
 ## Moves keyboard focus to the next (`dir >= 0`) or previous (`dir < 0`)
@@ -107,11 +107,11 @@ end
 ## Returns `1` when focus moved, `0` when nothing is focusable.
 pub function input_tab_next(st: InputState, root: Widget, dir: int) -> int
     if st is null or root is null
-        return 0
+        return false
     end
     let ids = focus_order(root)
     if len(ids) == 0
-        return 0
+        return false
     end
     let at = focus_index(ids, st.focus)
     if dir < 0
@@ -127,7 +127,7 @@ pub function input_tab_next(st: InputState, root: Widget, dir: int) -> int
     end
     st.focus = ids[at]
     st.composing = ""
-    return 1
+    return true
 end
 
 # Depth-first ids of focusable, enabled, visible widgets.
@@ -138,10 +138,10 @@ function focus_order(root: Widget) -> array
 end
 
 function focus_collect(w: Widget, out: array) -> int
-    if w is null or w.visible == 0 or w.enabled == 0
+    if w is null or w.visible == false or w.enabled == false
         return 0
     end
-    if input_is_focusable(w.kind) == 1 and w.id != ""
+    if input_is_focusable(w.kind) == true and w.id != ""
         out.push(w.id)
     end
     let i = 0
@@ -176,7 +176,7 @@ end
 ## topmost hit id (`""` on a miss). Returns `1` when hover changed.
 pub function dispatch_mouse_move(st: InputState, root: Widget, x: int, y: int) -> int
     if st is null
-        return 0
+        return false
     end
     st.mouse_x = x
     st.mouse_y = y
@@ -188,10 +188,10 @@ pub function dispatch_mouse_move(st: InputState, root: Widget, x: int, y: int) -
         end
     end
     if id == st.hover
-        return 0
+        return false
     end
     st.hover = id
-    return 1
+    return true
 end
 
 ## Routes mouse press: records the pressed id, moves focus to a focusable
@@ -199,14 +199,14 @@ end
 ## (enabled) widget was hit, else `0`.
 pub function dispatch_mouse_down(st: InputState, root: Widget, x: int, y: int) -> int
     if st is null
-        return 0
+        return false
     end
     st.mouse_x = x
     st.mouse_y = y
     st.pressed = ""
     if root is null
         st.focus = ""
-        return 0
+        return false
     end
     // A press on an open dropdown's rows targets the list, not the
     // underlying widget: keep the list open for release-to-select.
@@ -214,22 +214,22 @@ pub function dispatch_mouse_down(st: InputState, root: Widget, x: int, y: int) -
     if drop != ""
         st.pressed = drop
         st.focus = drop
-        return 1
+        return true
     end
     let hit = widget_hit(root, x, y)
-    if hit is null or hit.enabled == 0
+    if hit is null or hit.enabled == false
         close_other_dropdowns(root, "")
         st.focus = ""
-        return 0
+        return false
     end
     st.pressed = hit.id
     if hit.kind != "dropdown"
         close_other_dropdowns(root, hit.id)
     end
-    if input_is_focusable(hit.kind) == 1
+    if input_is_focusable(hit.kind) == true
         st.focus = hit.id
     end
-    return 1
+    return true
 end
 
 ## Routes mouse release: a release over the pressed widget activates it
@@ -237,22 +237,22 @@ end
 ## press. Returns the activation result (`1`/`0`).
 pub function dispatch_mouse_up(st: InputState, root: Widget, x: int, y: int) -> int
     if st is null
-        return 0
+        return false
     end
     st.mouse_x = x
     st.mouse_y = y
     if st.pressed == "" or root is null
         st.pressed = ""
-        return 0
+        return false
     end
     let target = widget_find(root, st.pressed)
     st.pressed = ""
-    if target is null or target.enabled == 0
-        return 0
+    if target is null or target.enabled == false
+        return false
     end
     let hit = widget_hit(root, x, y)
     if hit is null or hit.id != target.id
-        return 0
+        return false
     end
     return dispatch_click(root, x, y)
 end
@@ -269,20 +269,20 @@ end
 ## arrive separately via `dispatch_text`.
 pub function dispatch_key(st: InputState, root: Widget, key: int) -> int
     if st is null or root is null
-        return 0
+        return false
     end
     if key == 27
         if st.focus != ""
             let fe = widget_find(root, st.focus)
-            if fe is not null and fe.kind == "dropdown" and fe.open == 1
-                fe.open = 0
-                fe.dirty = 1
-                return 1
+            if fe is not null and fe.kind == "dropdown" and fe.open == true
+                fe.open = false
+                fe.dirty = true
+                return true
             end
         end
         st.focus = ""
         st.composing = ""
-        return 1
+        return true
     end
     if key == 9
         // Tab cycles focus (Shift+Tab is indistinguishable by key code
@@ -290,17 +290,17 @@ pub function dispatch_key(st: InputState, root: Widget, key: int) -> int
         return input_tab_next(st, root, 1)
     end
     if st.focus == ""
-        return 0
+        return false
     end
     let target = widget_find(root, st.focus)
-    if target is null or target.enabled == 0
-        return 0
+    if target is null or target.enabled == false
+        return false
     end
     if target.kind == "button" or target.kind == "checkbox" or target.kind == "radio"
         if key == 13 or key == 32
             return dispatch_click(root, widget_center_x(target), widget_center_y(target))
         end
-        return 0
+        return false
     end
     if target.kind == "slider"
         return slider_key(target, key)
@@ -309,15 +309,15 @@ pub function dispatch_key(st: InputState, root: Widget, key: int) -> int
         if key == 13 or key == 32
             if target.kind == "dropdown"
                 close_other_dropdowns(root, target.id)
-                if target.open == 1
-                    target.open = 0
+                if target.open == true
+                    target.open = false
                 else
-                    target.open = 1
+                    target.open = true
                 end
-                target.dirty = 1
-                return 1
+                target.dirty = true
+                return true
             end
-            return 0
+            return false
         end
         return option_key(target, key)
     end
@@ -330,11 +330,11 @@ pub function dispatch_key(st: InputState, root: Widget, key: int) -> int
                 let cb = target.on_change
                 cb(target)
             end
-            return 1
+            return true
         end
-        return 0
+        return false
     end
-    return 0
+    return false
 end
 
 ## Routes committed text to the focused text input (`TextInput` kind).
@@ -343,17 +343,17 @@ end
 ## `on_change`. Returns `1` when applied, `0` otherwise.
 pub function dispatch_text(st: InputState, root: Widget, text: string) -> int
     if st is null or root is null or text is null or text == ""
-        return 0
+        return false
     end
     if st.focus == ""
-        return 0
+        return false
     end
     let target = widget_find(root, st.focus)
-    if target is null or target.enabled == 0
-        return 0
+    if target is null or target.enabled == false
+        return false
     end
     if target.kind != "textinput" and target.kind != "textarea"
-        return 0
+        return false
     end
     return textinput_append(target, text)
 end
@@ -366,7 +366,7 @@ end
 ## Redraw are observed, not consumed (return `0`).
 pub function dispatch_event(st: InputState, root: Widget, ev: GuiEvent) -> int
     if st is null or ev is null
-        return 0
+        return false
     end
     if ev.kind == GuiEventKind.MouseMove
         return dispatch_mouse_move(st, root, ev.x, ev.y)
@@ -393,39 +393,39 @@ pub function dispatch_event(st: InputState, root: Widget, ev: GuiEvent) -> int
         return dispatch_ime_end(st, root, ev.text)
     end
     if ev.kind == GuiEventKind.Focus
-        if ev.key == 0
+        if ev.key == false
             return input_blur(st)
         end
         if root is not null and st.hover != ""
             return input_focus(st, root, st.hover)
         end
-        return 0
+        return false
     end
-    return 0
+    return false
 end
 
 ## Starts an IME composition on the focused text input: clears any stale
 ## preview. Returns `1` when a live input has focus, else `0`.
 pub function dispatch_ime_start(st: InputState, root: Widget) -> int
     if ime_target(st, root) is null
-        return 0
+        return false
     end
     st.composing = ""
-    return 1
+    return true
 end
 
 ## Updates the IME preview string (kept in state, not yet committed).
 ## Returns `1` when a live input has focus, else `0`.
 pub function dispatch_ime_update(st: InputState, root: Widget, text: string) -> int
     if ime_target(st, root) is null
-        return 0
+        return false
     end
     if text is null
         st.composing = ""
     else
         st.composing = text
     end
-    return 1
+    return true
 end
 
 ## Ends the composition, committing `text` (or the preview when `text`
@@ -437,7 +437,7 @@ pub function dispatch_ime_end(st: InputState, root: Widget, text: string) -> int
         if st is not null
             st.composing = ""
         end
-        return 0
+        return false
     end
     let final = text
     if final is null or final == ""
@@ -453,7 +453,7 @@ function ime_target(st: InputState, root: Widget)
         return null
     end
     let target = widget_find(root, st.focus)
-    if target is null or target.enabled == 0
+    if target is null or target.enabled == false
         return null
     end
     if target.kind != "textinput" and target.kind != "textarea"
@@ -499,7 +499,7 @@ function slider_key(slider: Widget, key: int) -> int
     if key == 39 or key == 38
         return slider_set_value(slider, slider.value + step)
     end
-    return 0
+    return false
 end
 
 # Assigns a clamped slider value, firing `on_change` on movement.
@@ -507,7 +507,7 @@ function slider_set_value(slider: Widget, v: int) -> int
     let lo = slider.min_val
     let hi = slider.max_val
     if hi < lo
-        return 0
+        return false
     end
     if v < lo
         v = lo
@@ -516,7 +516,7 @@ function slider_set_value(slider: Widget, v: int) -> int
         v = hi
     end
     if v == slider.value
-        return 0
+        return false
     end
     slider.value = v
     widget_mark_dirty(slider)
@@ -524,13 +524,13 @@ function slider_set_value(slider: Widget, v: int) -> int
         let cb = slider.on_change
         cb(slider)
     end
-    return 1
+    return true
 end
 
 # Moves a dropdown/listview selection with Up/Down; returns 1 on change.
 function option_key(w: Widget, key: int) -> int
     if w.options is null or len(w.options) == 0
-        return 0
+        return false
     end
     let idx = w.value
     if key == 38
@@ -539,7 +539,7 @@ function option_key(w: Widget, key: int) -> int
         if key == 40
             idx += 1
         else
-            return 0
+            return false
         end
     end
     if idx < 0
@@ -549,7 +549,7 @@ function option_key(w: Widget, key: int) -> int
         idx = len(w.options) - 1
     end
     if idx == w.value
-        return 0
+        return false
     end
     w.value = idx
     widget_mark_dirty(w)
@@ -557,7 +557,7 @@ function option_key(w: Widget, key: int) -> int
         let cb = w.on_change
         cb(w)
     end
-    return 1
+    return true
 end
 
 # Drops the last byte of a text input (ASCII-safe; IME compositions arrive
@@ -565,7 +565,7 @@ end
 function textinput_backspace(w: Widget) -> int
     let n = len(w.text)
     if n <= 0
-        return 0
+        return false
     end
     w.text = w.text[0..n - 1]
     widget_mark_dirty(w)
@@ -573,13 +573,13 @@ function textinput_backspace(w: Widget) -> int
         let cb = w.on_change
         cb(w)
     end
-    return 1
+    return true
 end
 
 # Appends committed text to an input; fires `on_change`; returns 1.
 function textinput_append(w: Widget, text: string) -> int
     if text is null or text == ""
-        return 0
+        return false
     end
     w.text = w.text + text
     widget_mark_dirty(w)
@@ -587,5 +587,5 @@ function textinput_append(w: Widget, text: string) -> int
         let cb = w.on_change
         cb(w)
     end
-    return 1
+    return true
 end

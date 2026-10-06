@@ -28,12 +28,12 @@ function main()
     runner_assert_eq(r, pkg::signal_observe(s, watch_b), 2, "second watcher")
 
     # 2. Same-value assignment is a no-op
-    runner_assert_eq(r, pkg::signal_assign(s, 10), 0, "same value returns 0")
+    runner_assert_eq(r, pkg::signal_assign(s, 10), false, "same value returns 0")
     runner_assert_eq(r, pkg::signal_version(s), 0, "version unchanged")
     runner_assert_eq(r, len(fired), 0, "no watcher fired")
 
     # 3. Change notifies every watcher in order
-    runner_assert_eq(r, pkg::signal_assign(s, 20), 1, "change returns 1")
+    runner_assert_eq(r, pkg::signal_assign(s, 20), true, "change returns 1")
     runner_assert_eq(r, pkg::signal_value(s), 20, "new value")
     runner_assert_eq(r, pkg::signal_version(s), 1, "version bumped")
     runner_assert_eq(r, len(fired), 2, "both watchers fired")
@@ -42,16 +42,16 @@ function main()
 
     # 4. Null safety
     runner_assert(r, pkg::signal_value(null) is null, "null signal reads null")
-    runner_assert_eq(r, pkg::signal_assign(null, 1), 0, "null assign is 0")
+    runner_assert_eq(r, pkg::signal_assign(null, 1), false, "null assign is 0")
     runner_assert_eq(r, pkg::signal_observe(null, watch_a), 0, "null observe is 0")
 
     # 5. Dirty lifecycle on widgets
     let w = pkg::label("st", "Ready")
-    runner_assert_eq(r, pkg::widget_is_dirty(w), 0, "clean initially")
-    runner_assert_eq(r, pkg::widget_mark_dirty(w), 1, "mark returns 1")
-    runner_assert_eq(r, pkg::widget_is_dirty(w), 1, "dirty after mark")
-    runner_assert_eq(r, pkg::widget_clear_dirty(w), 1, "clear returns 1")
-    runner_assert_eq(r, pkg::widget_is_dirty(w), 0, "clean after clear")
+    runner_assert_eq(r, pkg::widget_is_dirty(w), false, "clean initially")
+    runner_assert_eq(r, pkg::widget_mark_dirty(w), true, "mark returns 1")
+    runner_assert_eq(r, pkg::widget_is_dirty(w), true, "dirty after mark")
+    runner_assert_eq(r, pkg::widget_clear_dirty(w), true, "clear returns 1")
+    runner_assert_eq(r, pkg::widget_is_dirty(w), false, "clean after clear")
 
     # 6. Text binding refreshes every bound widget
     let t = pkg::signal(0)
@@ -61,13 +61,13 @@ function main()
     runner_assert_eq(r, pkg::bind_text(t, l1), 1, "first bind")
     runner_assert_eq(r, pkg::bind_text(t, l2), 1, "second bind, one updater")
     runner_assert_str_eq(r, l1.text, "0", "initial bind text")
-    runner_assert_eq(r, pkg::widget_is_dirty(l1), 1, "bind marks dirty")
+    runner_assert_eq(r, pkg::widget_is_dirty(l1), true, "bind marks dirty")
     pkg::widget_clear_dirty(l1)
     pkg::widget_clear_dirty(l2)
-    runner_assert_eq(r, pkg::signal_assign(t, 42), 1, "bound change")
+    runner_assert_eq(r, pkg::signal_assign(t, 42), true, "bound change")
     runner_assert_str_eq(r, l1.text, "42", "first widget refreshed")
     runner_assert_str_eq(r, l2.text, "42", "second widget refreshed")
-    runner_assert_eq(r, pkg::widget_is_dirty(l1), 1, "refresh marks dirty")
+    runner_assert_eq(r, pkg::widget_is_dirty(l1), true, "refresh marks dirty")
     runner_assert_str_eq(r, plain.text, "?", "unbound untouched")
 
     # 7. Damage list + subtree clear (selective repaint input)

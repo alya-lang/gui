@@ -39,18 +39,18 @@ end
 ## native backends upload + swap here).
 pub function surface_present(s: DrawSurface) -> int
     if s is null
-        return 0
+        return false
     end
-    return 1
+    return true
 end
 
 ## Rebuilds the surface at a new size (content is reset to `bg`).
 pub function surface_resize(s: DrawSurface, w: int, h: int, bg: int = 0) -> int
     if s is null
-        return 0
+        return false
     end
     s.ctx = drawctx_new(w, h, bg)
     s.w = w
     s.h = h
-    return 1
+    return true
 end

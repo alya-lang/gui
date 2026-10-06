@@ -10,13 +10,13 @@ function main()
 
     let q = pkg::event_queue()
     runner_assert_eq(r, pkg::event_queue_len(q), 0, "new queue empty")
-    runner_assert_eq(r, pkg::event_queue_is_empty(q), 1, "is_empty on new queue")
+    runner_assert_eq(r, pkg::event_queue_is_empty(q), true, "is_empty on new queue")
     runner_assert(r, pkg::event_queue_poll(q) is null, "poll empty is null")
     runner_assert(r, pkg::event_queue_peek(q) is null, "peek empty is null")
 
     runner_assert_eq(r, pkg::event_queue_push(q, pkg::event_new(pkg::GuiEventKind.MouseDown, 5, 6)), 1, "push returns len 1")
     runner_assert_eq(r, pkg::event_queue_push(q, pkg::event_new(pkg::GuiEventKind.KeyDown, 0, 0, 65)), 2, "push returns len 2")
-    runner_assert_eq(r, pkg::event_queue_is_empty(q), 0, "non-empty queue")
+    runner_assert_eq(r, pkg::event_queue_is_empty(q), false, "non-empty queue")
 
     let peeked = pkg::event_queue_peek(q)
     runner_assert_eq(r, peeked.kind, pkg::GuiEventKind.MouseDown, "peek sees first")
@@ -45,7 +45,7 @@ function main()
     runner_assert_eq(r, pkg::event_queue_len(q), 0, "200 drained after compaction")
 
     pkg::event_queue_push(q, pkg::event_new(pkg::GuiEventKind.Close))
-    runner_assert_eq(r, pkg::event_queue_clear(q), 1, "clear returns 1")
+    runner_assert_eq(r, pkg::event_queue_clear(q), true, "clear returns 1")
     runner_assert_eq(r, pkg::event_queue_len(q), 0, "cleared queue")
 
     let failed = runner_summary(r)

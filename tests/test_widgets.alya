@@ -45,27 +45,27 @@ function main()
 
     # 3. Click dispatch invokes the button callback
     pkg::widget_on_click(btn, record_click)
-    runner_assert_eq(r, pkg::click(root, 20, 20), 1, "click consumed")
+    runner_assert_eq(r, pkg::click(root, 20, 20), true, "click consumed")
     runner_assert_eq(r, len(fired), 1, "callback fired once")
-    runner_assert_eq(r, pkg::click(root, 500, 500), 0, "miss returns 0")
+    runner_assert_eq(r, pkg::click(root, 500, 500), false, "miss returns 0")
 
     # 4. Checkbox toggles state and fires on_change
-    let cb = pkg::checkbox("agree", 0)
+    let cb = pkg::checkbox("agree", false)
     pkg::widget_set_rect(cb, pkg::rect(10, 100, 20, 20))
     pkg::widget_add_child(root, cb)
     pkg::widget_on_change(cb, record_change)
-    runner_assert_eq(r, pkg::click(root, 15, 110), 1, "checkbox click consumed")
-    runner_assert_eq(r, cb.value, 1, "checkbox toggled on")
+    runner_assert_eq(r, pkg::click(root, 15, 110), true, "checkbox click consumed")
+    runner_assert_eq(r, cb.value, true, "checkbox toggled on")
     runner_assert_eq(r, len(fired), 2, "change fired")
-    runner_assert_eq(r, pkg::click(root, 15, 110), 1, "second click consumed")
-    runner_assert_eq(r, cb.value, 0, "checkbox toggled off")
+    runner_assert_eq(r, pkg::click(root, 15, 110), true, "second click consumed")
+    runner_assert_eq(r, cb.value, false, "checkbox toggled off")
 
     # 5. Disabled and hidden nodes never dispatch
-    pkg::widget_set_enabled(btn, 0)
-    runner_assert_eq(r, pkg::click(root, 20, 20), 0, "disabled button ignored")
+    pkg::widget_set_enabled(btn, false)
+    runner_assert_eq(r, pkg::click(root, 20, 20), false, "disabled button ignored")
     runner_assert_eq(r, len(fired), 3, "no extra callback")
-    pkg::widget_set_enabled(btn, 1)
-    pkg::widget_set_visible(lbl, 0)
+    pkg::widget_set_enabled(btn, true)
+    pkg::widget_set_visible(lbl, false)
     runner_assert(r, pkg::widget_hit(root, 20, 55) is not null, "hidden label skipped, root hit")
     runner_assert_str_eq(r, pkg::widget_hit(root, 20, 55).id, "root", "falls back to root")
 

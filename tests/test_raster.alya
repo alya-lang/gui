@@ -12,7 +12,7 @@ function main()
     let img = pkg::canvas(4, 3, 0)
     runner_assert_eq(r, pkg::image_get_px(img, 0, 0), 0, "fresh pixel")
     runner_assert_eq(r, pkg::image_get_px(img, 9, 9), -1, "OOB reads -1")
-    runner_assert_eq(r, pkg::image_set_px(img, 9, 9, 7), 0, "OOB write clipped")
+    runner_assert_eq(r, pkg::image_set_px(img, 9, 9, 7), false, "OOB write clipped")
     runner_assert_eq(r, pkg::canvas_fill(img, 5), 12, "fill paints all")
     runner_assert_eq(r, pkg::image_get_px(img, 3, 2), 5, "fill value")
 

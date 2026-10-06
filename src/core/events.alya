@@ -33,9 +33,9 @@ end
 ## Returns 1 when no events are pending.
 pub function event_queue_is_empty(q: GuiEventQueue) -> int
     if event_queue_len(q) == 0
-        return 1
+        return true
     end
-    return 0
+    return false
 end
 
 ## Appends an event; returns the pending count afterwards.
@@ -78,9 +78,9 @@ end
 ## Drops all pending events and resets the cursor.
 pub function event_queue_clear(q: GuiEventQueue) -> int
     if q is null
-        return 0
+        return false
     end
     q.events = []
     q.head = 0
-    return 1
+    return true
 end

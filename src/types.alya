@@ -238,23 +238,23 @@ end
 ## Returns 1 when the rect is empty (`w <= 0` or `h <= 0`).
 pub function Rect.is_empty(self: Rect) -> int
     if self.w <= 0 or self.h <= 0
-        return 1
+        return true
     end
-    return 0
+    return false
 end
 
 ## Returns 1 when the point lies inside the rect (edges inclusive, empty never contains).
 pub function Rect.contains(self: Rect, x: int, y: int) -> int
-    if self.is_empty() == 1
-        return 0
+    if self.is_empty() == true
+        return false
     end
     if x < self.x or y < self.y
-        return 0
+        return false
     end
     if x > self.x + self.w or y > self.y + self.h
-        return 0
+        return false
     end
-    return 1
+    return true
 end
 
 ## Returns the pixel area (`w * h`), or `0` for empty sizes.

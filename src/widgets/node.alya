@@ -51,8 +51,8 @@ pub function widget_new(kind: string, id: string = "") -> Widget
         id: id,
         kind: kind,
         rect: Rect { x: 0, y: 0, w: 0, h: 0 },
-        visible: 1,
-        enabled: 1,
+        visible: true,
+        enabled: true,
         text: "",
         value: 0,
         children: [],
@@ -60,8 +60,8 @@ pub function widget_new(kind: string, id: string = "") -> Widget
         group: "",
         min_val: 0,
         max_val: 100,
-        dirty: 0,
-        open: 0,
+        dirty: false,
+        open: false,
         on_click: null,
         on_change: null
     }
@@ -143,7 +143,7 @@ end
 ## itself when it contains the point, else null. Invisible subtrees
 ## never participate.
 pub function widget_hit(root: Widget, x: int, y: int)
-    if root is null or root.visible == 0
+    if root is null or root.visible == false
         return null
     end
     let i = len(root.children) - 1
@@ -154,7 +154,7 @@ pub function widget_hit(root: Widget, x: int, y: int)
         end
         i -= 1
     end
-    if rect_contains(root.rect, x, y) == 1
+    if rect_contains(root.rect, x, y) == true
         return root
     end
     return null
@@ -207,7 +207,7 @@ end
 
 # Depth-first accessible record collection.
 function a11y_collect(w: Widget, out: array) -> int
-    if w is null or w.visible == 0
+    if w is null or w.visible == false
         return 0
     end
     out.push({
@@ -230,45 +230,45 @@ end
 ## Moves/resizes the node in parent coordinates.
 pub function widget_set_rect(w: Widget, r: Rect) -> int
     if w is null
-        return 0
+        return false
     end
     w.rect = r
-    return 1
+    return true
 end
 
 ## Sets caption/content text.
 pub function widget_set_text(w: Widget, text: string) -> int
     if w is null
-        return 0
+        return false
     end
     w.text = text
-    return 1
+    return true
 end
 
 ## Shows (`1`) or hides (`0`) the node; returns the new flag.
 pub function widget_set_visible(w: Widget, flag: int) -> int
     if w is null
-        return 0
+        return false
     end
-    if flag == 0
-        w.visible = 0
-        return 0
+    if flag == false
+        w.visible = false
+        return false
     end
-    w.visible = 1
-    return 1
+    w.visible = true
+    return true
 end
 
 ## Enables (`1`) or disables (`0`) the node; returns the new flag.
 pub function widget_set_enabled(w: Widget, flag: int) -> int
     if w is null
-        return 0
+        return false
     end
-    if flag == 0
-        w.enabled = 0
-        return 0
+    if flag == false
+        w.enabled = false
+        return false
     end
-    w.enabled = 1
-    return 1
+    w.enabled = true
+    return true
 end
 
 ## Collects the ids of dirty, visible nodes depth-first (the damage list
@@ -281,10 +281,10 @@ end
 
 # Depth-first damage collection (invisible subtrees never repaint).
 function dirty_collect(w: Widget, out: array) -> int
-    if w is null or w.visible == 0
+    if w is null or w.visible == false
         return 0
     end
-    if w.dirty == 1
+    if w.dirty == true
         out.push(w.id)
     end
     let i = 0
@@ -298,12 +298,12 @@ end
 ## Clears the redraw flag on the whole visible sub-tree; returns the
 ## cleared count.
 pub function widget_clear_subtree(root: Widget) -> int
-    if root is null or root.visible == 0
+    if root is null or root.visible == false
         return 0
     end
     let n = 0
-    if root.dirty == 1
-        root.dirty = 0
+    if root.dirty == true
+        root.dirty = false
         n = 1
     end
     let i = 0

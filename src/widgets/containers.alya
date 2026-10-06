@@ -103,17 +103,17 @@ end
 ## Moves offsets, clamped into range; returns `1`.
 pub function scroll_to(st: ScrollState, x: int, y: int) -> int
     if st is null
-        return 0
+        return false
     end
     st.scroll_x = scroll_clamp_value(x, scroll_max_x(st))
     st.scroll_y = scroll_clamp_value(y, scroll_max_y(st))
-    return 1
+    return true
 end
 
 ## Moves offsets relatively (clamped); returns `1`.
 pub function scroll_by(st: ScrollState, dx: int, dy: int) -> int
     if st is null
-        return 0
+        return false
     end
     return scroll_to(st, st.scroll_x + dx, st.scroll_y + dy)
 end

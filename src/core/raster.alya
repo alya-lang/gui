@@ -48,10 +48,10 @@ end
 ## Writes one clipped pixel; returns `1` when inside, `0` when clipped.
 pub function image_set_px(img: Image, x: int, y: int, color: int) -> int
     if img is null or x < 0 or y < 0 or x >= img.w or y >= img.h
-        return 0
+        return false
     end
     img.pixels[y * img.w + x] = color
-    return 1
+    return true
 end
 
 ## Reads one pixel, or `-1` when out of bounds.
@@ -105,7 +105,7 @@ pub function image_line(img: Image, x0: int, y0: int, x1: int, y1: int, color: i
     let err = dx - dy
     let x = x0
     let y = y0
-    while 1
+    while true
         n = n + image_set_px(img, x, y, color)
         if x == x1 and y == y1
             break

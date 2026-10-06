@@ -15,13 +15,13 @@ import "../types.alya"
 ## Linux probing order follows the roadmap: `WAYLAND_DISPLAY` first
 ## (native Wayland), then `DISPLAY` (X11 fallback).
 pub function backend_select() -> string
-    if os::is_windows() == 1
+    if os::is_windows() == true
         return "windows"
     end
-    if os::is_macos() == 1
+    if os::is_macos() == true
         return "macos"
     end
-    if os::is_linux() == 1
+    if os::is_linux() == true
         if os::env("WAYLAND_DISPLAY") != ""
             return "wayland"
         end
@@ -48,12 +48,12 @@ end
 ##
 ## Windows and macOS always report `0` (their window managers are implicit).
 pub function is_headless() -> int
-    if os::is_linux() == 1
+    if os::is_linux() == true
         if backend_display() == ""
-            return 1
+            return true
         end
     end
-    return 0
+    return false
 end
 
 ## Collects backend name, OS name, and display endpoint in one record.

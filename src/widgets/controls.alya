@@ -30,10 +30,10 @@ end
 ## Creates a checkbox (`value` is the checked flag).
 pub function checkbox_new(id: string, checked: int = 0) -> Widget
     let w = widget_new("checkbox", id)
-    if checked == 0
-        w.value = 0
+    if checked == false
+        w.value = false
     else
-        w.value = 1
+        w.value = true
     end
     return w
 end
@@ -51,10 +51,10 @@ end
 pub function radio_new(id: string, group: string, selected: int = 0) -> Widget
     let w = widget_new("radio", id)
     w.group = group
-    if selected == 0
-        w.value = 0
+    if selected == false
+        w.value = false
     else
-        w.value = 1
+        w.value = true
     end
     return w
 end
@@ -135,39 +135,39 @@ end
 ## (fires its `on_change` when set), `0` otherwise.
 pub function radio_group_select(root: Widget, group: string, id: string) -> int
     if root is null or group is null or id is null
-        return 0
+        return false
     end
     let found = radio_apply(root, group, id)
-    if found == 0
-        return 0
+    if found == false
+        return false
     end
     let target: Widget = widget_find(root, id)
     if target is not null and target.on_change is not null
         let ccb = target.on_change
         ccb(target)
     end
-    return 1
+    return true
 end
 
 # Marks the matching radio selected and its group mates deselected.
 # Returns 1 when `id` exists in `group`, 0 otherwise.
 function radio_apply(node: Widget, group: string, id: string) -> int
-    if node is null or node.visible == 0
-        return 0
+    if node is null or node.visible == false
+        return false
     end
-    let found = 0
+    let found = false
     if node.kind == "radio" and node.group == group
         if node.id == id
-            node.value = 1
-            found = 1
+            node.value = true
+            found = true
         else
-            node.value = 0
+            node.value = false
         end
     end
     let i = 0
     while i < len(node.children)
-        if radio_apply(node.children[i], group, id) == 1
-            found = 1
+        if radio_apply(node.children[i], group, id) == true
+            found = true
         end
         i += 1
     end
@@ -203,25 +203,25 @@ end
 ## - Anything else, disabled nodes, or a miss: returns `0`.
 pub function dispatch_click(root: Widget, x: int, y: int) -> int
     let target = widget_hit(root, x, y)
-    if target is null or target.enabled == 0
-        return 0
+    if target is null or target.enabled == false
+        return false
     end
     if target.kind == "dropdown"
         close_other_dropdowns(root, target.id)
-        if target.open == 1
-            target.open = 0
+        if target.open == true
+            target.open = false
         else
-            target.open = 1
+            target.open = true
         end
-        target.dirty = 1
-        return 1
+        target.dirty = true
+        return true
     end
     // An open dropdown list floats above siblings: row clicks capture
     // before underlying widgets activate (popup-modal behavior), and a
     // click anywhere else closes the list first.
     let picked = dropdown_list_apply(root, x, y)
-    if picked == 1
-        return 1
+    if picked == true
+        return true
     end
     close_other_dropdowns(root, "")
     if target.kind == "button"
@@ -229,19 +229,19 @@ pub function dispatch_click(root: Widget, x: int, y: int) -> int
             let cb = target.on_click
             cb(target)
         end
-        return 1
+        return true
     end
     if target.kind == "checkbox"
-        if target.value == 0
-            target.value = 1
+        if target.value == false
+            target.value = true
         else
-            target.value = 0
+            target.value = false
         end
         if target.on_change is not null
             let ccb = target.on_change
             ccb(target)
         end
-        return 1
+        return true
     end
     if target.kind == "radio"
         return radio_group_select(root, target.group, target.id)
@@ -252,9 +252,9 @@ pub function dispatch_click(root: Widget, x: int, y: int) -> int
             let scb = target.on_change
             scb(target)
         end
-        return 1
+        return true
     end
-    return 0
+    return false
 end
 
 # Row height of an open dropdown list.
@@ -269,9 +269,9 @@ pub function close_other_dropdowns(root: Widget, except_id: string) -> int
         return 0
     end
     let n = 0
-    if root.kind == "dropdown" and root.open == 1 and root.id != except_id
-        root.open = 0
-        root.dirty = 1
+    if root.kind == "dropdown" and root.open == true and root.id != except_id
+        root.open = false
+        root.dirty = true
         n = 1
     end
     let i = 0
@@ -285,14 +285,14 @@ end
 # Selects an open-dropdown row under (`x`, `y`): returns 1 when a row was
 # hit (selecting + closing + firing `on_change` on real changes).
 function dropdown_list_apply(node: Widget, x: int, y: int) -> int
-    if node is null or node.visible == 0
-        return 0
+    if node is null or node.visible == false
+        return false
     end
-    if node.kind == "dropdown" and node.open == 1 and node.enabled == 1
+    if node.kind == "dropdown" and node.open == true and node.enabled == true
         let idx = dropdown_row_at(node, x, y)
         if idx >= 0
-            node.open = 0
-            node.dirty = 1
+            node.open = false
+            node.dirty = true
             if idx != node.value
                 node.value = idx
                 if node.on_change is not null
@@ -300,17 +300,17 @@ function dropdown_list_apply(node: Widget, x: int, y: int) -> int
                     cb(node)
                 end
             end
-            return 1
+            return true
         end
     end
     let i = 0
     while i < len(node.children)
-        if dropdown_list_apply(node.children[i], x, y) == 1
-            return 1
+        if dropdown_list_apply(node.children[i], x, y) == true
+            return true
         end
         i += 1
     end
-    return 0
+    return false
 end
 
 # Option-row index under (`x`, `y`) for an open dropdown (`-1` on a miss).
@@ -336,7 +336,7 @@ pub function dropdown_open_at(root: Widget, x: int, y: int) -> string
     if root is null
         return ""
     end
-    if root.kind == "dropdown" and root.open == 1 and root.enabled == 1
+    if root.kind == "dropdown" and root.open == true and root.enabled == true
         if dropdown_row_at(root, x, y) >= 0
             return root.id
         end
@@ -382,19 +382,19 @@ end
 ## Returns `1` when a handler ran, else `0`.
 pub function dispatch_bubble(root: Widget, x: int, y: int) -> int
     if root is null
-        return 0
+        return false
     end
     let node = widget_hit(root, x, y)
     while node is not null
-        if node.enabled == 1 and node.on_click is not null
+        if node.enabled == true and node.on_click is not null
             let cb = node.on_click
             cb(node)
-            return 1
+            return true
         end
         if node.id == root.id
-            return 0
+            return false
         end
         node = widget_parent(root, node.id)
     end
-    return 0
+    return false
 end

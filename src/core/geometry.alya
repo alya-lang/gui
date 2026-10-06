@@ -28,21 +28,21 @@ end
 
 ## Returns 1 when the two rects overlap with positive area.
 pub function rect_intersects(a: Rect, b: Rect) -> int
-    if a.is_empty() == 1 or b.is_empty() == 1
-        return 0
+    if a.is_empty() == true or b.is_empty() == true
+        return false
     end
     if a.x + a.w <= b.x or b.x + b.w <= a.x
-        return 0
+        return false
     end
     if a.y + a.h <= b.y or b.y + b.h <= a.y
-        return 0
+        return false
     end
-    return 1
+    return true
 end
 
 ## Returns the overlap region, or an empty rect when there is none.
 pub function rect_intersect(a: Rect, b: Rect) -> Rect
-    if rect_intersects(a, b) == 0
+    if rect_intersects(a, b) == false
         return Rect { x: 0, y: 0, w: 0, h: 0 }
     end
     let x0 = a.x
@@ -66,10 +66,10 @@ end
 
 ## Returns the smallest rect enclosing both inputs.
 pub function rect_union(a: Rect, b: Rect) -> Rect
-    if a.is_empty() == 1
+    if a.is_empty() == true
         return b
     end
-    if b.is_empty() == 1
+    if b.is_empty() == true
         return a
     end
     let x0 = a.x

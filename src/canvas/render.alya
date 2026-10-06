@@ -78,25 +78,25 @@ end
 # Each overlay is a map: {"x", "y", "text", "color"}. `pressed`/`hover`
 # carry widget ids for state styling; disabled nodes render dimmed.
 function paint_node(img: Image, w: Widget, pressed: string, hover: string, texts: array) -> int
-    if w is null or w.visible == 0
-        return 0
+    if w is null or w.visible == false
+        return false
     end
     let r = w.rect
     if r.w <= 0 or r.h <= 0
-        return 0
+        return false
     end
-    let dim = 0
-    if w.enabled == 0
-        dim = 1
+    let dim = false
+    if w.enabled == false
+        dim = true
     end
     if w.kind == "box" or w.kind == "stack"
         image_rect(img, r.x, r.y, r.w, r.h, theme_panel())
-        return 1
+        return true
     end
     if w.kind == "button"
         let fill = theme_ink()
         let tcol = theme_text()
-        if dim == 1
+        if dim == true
             fill = theme_panel()
             tcol = theme_muted()
         else
@@ -112,69 +112,69 @@ function paint_node(img: Image, w: Widget, pressed: string, hover: string, texts
         paint_shadow(img, r.x, r.y, r.w, r.h, 6)
         paint_framed(img, r.x, r.y, r.w, r.h, 6, fill, theme_muted())
         texts.push({"x": r.x + 10, "y": r.y + r.h / 2 - 7, "text": w.text, "color": tcol})
-        return 1
+        return true
     end
     if w.kind == "label"
         let lcol = theme_text()
-        if dim == 1
+        if dim == true
             lcol = theme_muted()
         end
         texts.push({"x": r.x, "y": r.y, "text": w.text, "color": lcol})
-        return 1
+        return true
     end
     if w.kind == "textinput" or w.kind == "textarea"
         let edge = theme_muted()
-        if dim == 0 and w.id != "" and w.id == hover
+        if dim == false and w.id != "" and w.id == hover
             edge = theme_text()
         end
         paint_framed(img, r.x, r.y, r.w, r.h, 6, theme_dark_text(), edge)
         let ncol = theme_text()
-        if dim == 1
+        if dim == true
             ncol = theme_muted()
         end
         texts.push({"x": r.x + 8, "y": r.y + 5, "text": w.text + "_", "color": ncol})
-        return 1
+        return true
     end
     if w.kind == "checkbox"
         let ecol = theme_muted()
-        if dim == 0 and w.id != "" and w.id == hover
+        if dim == false and w.id != "" and w.id == hover
             ecol = theme_text()
         end
         paint_framed(img, r.x, r.y + 2, 15, 15, 4, theme_dark_text(), ecol)
-        if w.value == 1
+        if w.value == true
             let ccol = theme_ok()
-            if dim == 1
+            if dim == true
                 ccol = theme_muted()
             end
             image_line(img, r.x + 4, r.y + 11, r.x + 7, r.y + 15, ccol)
             image_line(img, r.x + 7, r.y + 15, r.x + 13, r.y + 7, ccol)
         end
         let bcol = theme_text()
-        if dim == 1
+        if dim == true
             bcol = theme_muted()
         end
         texts.push({"x": r.x + 21, "y": r.y + 4, "text": w.id, "color": bcol})
-        return 1
+        return true
     end
     if w.kind == "radio"
         let ocol = theme_muted()
-        if dim == 0 and w.id != "" and w.id == hover
+        if dim == false and w.id != "" and w.id == hover
             ocol = theme_text()
         end
         image_circle(img, r.x + 8, r.y + 9, 6, ocol)
-        if w.value == 1
+        if w.value == true
             let dcol = theme_accent()
-            if dim == 1
+            if dim == true
                 dcol = theme_muted()
             end
             image_circle_filled(img, r.x + 8, r.y + 9, 3, dcol)
         end
         let ucol = theme_text()
-        if dim == 1
+        if dim == true
             ucol = theme_muted()
         end
         texts.push({"x": r.x + 21, "y": r.y + 4, "text": w.id, "color": ucol})
-        return 1
+        return true
     end
     if w.kind == "slider"
         let ty = r.y + r.h / 2 - 2
@@ -182,7 +182,7 @@ function paint_node(img: Image, w: Widget, pressed: string, hover: string, texts
         image_rect_rounded(img, r.x, ty, slider_fill_w(w), 5, 2, theme_accent())
         let kx = slider_knob_x(w)
         let kcol = theme_text()
-        if dim == 1
+        if dim == true
             kcol = theme_muted()
         else
             if w.id != "" and w.id == hover
@@ -191,34 +191,34 @@ function paint_node(img: Image, w: Widget, pressed: string, hover: string, texts
         end
         image_circle_filled(img, kx, r.y + r.h / 2, 8, theme_shadow())
         image_circle_filled(img, kx, r.y + r.h / 2, 7, kcol)
-        return 1
+        return true
     end
     if w.kind == "progress"
         paint_framed(img, r.x, r.y, r.w, r.h, 4, theme_ink(), theme_ink())
         image_rect_rounded(img, r.x + 2, r.y + 2, progress_fill_w(w), r.h - 4, 3, theme_ok())
-        return 1
+        return true
     end
     if w.kind == "dropdown"
         let dcol = theme_text()
-        if dim == 1
+        if dim == true
             dcol = theme_muted()
         end
         paint_shadow(img, r.x, r.y, r.w, r.h, 6)
         paint_framed(img, r.x, r.y, r.w, r.h, 6, theme_dark_text(), theme_muted())
         texts.push({"x": r.x + 8, "y": r.y + 5, "text": dropdown_label(w), "color": dcol})
         texts.push({"x": r.x + r.w - 16, "y": r.y + 5, "text": "v", "color": theme_muted()})
-        if w.open == 1
+        if w.open == true
             paint_dropdown_list(img, w, texts)
         end
-        return 1
+        return true
     end
     if w.kind == "listview"
         image_rect(img, r.x, r.y, r.w, r.h, theme_dark_text())
         paint_border(img, r, theme_muted())
         paint_rows(img, w)
-        return 1
+        return true
     end
-    return 0
+    return false
 end
 
 # Slider knob x from value (clamped).
@@ -325,11 +325,11 @@ end
 
 # Depth-first paint (parents before children); draws the focus ring last.
 function paint_tree(img: Image, root: Widget, focus: string, pressed: string, hover: string, texts: array) -> int
-    if root is null or root.visible == 0
-        return 0
+    if root is null or root.visible == false
+        return false
     end
     paint_node(img, root, pressed, hover, texts)
-    if root.id != "" and root.id == focus and root.enabled == 1
+    if root.id != "" and root.id == focus and root.enabled == true
         paint_border(img, root.rect, theme_accent())
     end
     let i = 0
@@ -337,7 +337,7 @@ function paint_tree(img: Image, root: Widget, focus: string, pressed: string, ho
         paint_tree(img, root.children[i], focus, pressed, hover, texts)
         i += 1
     end
-    return 1
+    return true
 end
 
 ## Paints the tree into a `w`x`h` image and presents it on `surf`,
@@ -349,7 +349,7 @@ end
 @cfg(feature = "native")
 pub function render_present(root: Widget, surf, w: int, h: int, focus: string = "", pressed: string = "", hover: string = "") -> int
     if root is null or surf is null or w <= 0 or h <= 0
-        return 0
+        return false
     end
     let img = image_new(w, h, theme_bg())
     let texts = []
@@ -359,8 +359,8 @@ pub function render_present(root: Widget, surf, w: int, h: int, focus: string = 
         native_gpu_stage(surf, i, img.pixels[i])
         i += 1
     end
-    if native_gpu_present(surf) == 0
-        return 0
+    if native_gpu_present(surf) == false
+        return false
     end
     let t = 0
     while t < len(texts)
@@ -368,5 +368,5 @@ pub function render_present(root: Widget, surf, w: int, h: int, focus: string = 
         native_gpu_text(surf, item["text"], item["x"], item["y"], 13, item["color"])
         t += 1
     end
-    return 1
+    return true
 end

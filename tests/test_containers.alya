@@ -25,14 +25,14 @@ function main()
 
     # 2. Scroll offsets with clamping
     let sc = pkg::scrollstate(200, 100, 500, 400)
-    runner_assert_eq(r, pkg::scrollmove(sc, 1000, -50), 1, "scroll returns 1")
+    runner_assert_eq(r, pkg::scrollmove(sc, 1000, -50), true, "scroll returns 1")
     runner_assert_eq(r, sc.scroll_x, 300, "x clamped to max")
     runner_assert_eq(r, sc.scroll_y, 0, "y floored at zero")
-    runner_assert_eq(r, pkg::scrollmove(sc, 50, 70), 1, "scroll inside range")
+    runner_assert_eq(r, pkg::scrollmove(sc, 50, 70), true, "scroll inside range")
     runner_assert_eq(r, sc.scroll_x, 50, "x set")
     runner_assert_eq(r, sc.scroll_y, 70, "y set")
     let fit = pkg::scrollstate(500, 500, 100, 100)
-    runner_assert_eq(r, pkg::scrollmove(fit, 30, 40), 1, "scroll fitting content")
+    runner_assert_eq(r, pkg::scrollmove(fit, 30, 40), true, "scroll fitting content")
     runner_assert_eq(r, fit.scroll_x, 0, "no horizontal room")
     runner_assert_eq(r, fit.scroll_y, 0, "no vertical room")
 

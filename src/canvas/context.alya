@@ -42,7 +42,7 @@ end
 ## Sets the stroke color and width (floored at 1).
 pub function ctx_set_stroke(ctx: DrawContext, color: Color, w: int = 1) -> int
     if ctx is null
-        return 0
+        return false
     end
     ctx.stroke = color
     if w < 1
@@ -50,16 +50,16 @@ pub function ctx_set_stroke(ctx: DrawContext, color: Color, w: int = 1) -> int
     else
         ctx.stroke_w = w
     end
-    return 1
+    return true
 end
 
 ## Sets the fill color.
 pub function ctx_set_fill(ctx: DrawContext, color: Color) -> int
     if ctx is null
-        return 0
+        return false
     end
     ctx.fill = color
-    return 1
+    return true
 end
 
 ## Strokes a 1px line (width>1 draws parallel offsets); returns painted count.

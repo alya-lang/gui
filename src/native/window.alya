@@ -42,22 +42,22 @@ end
 ## Destroys a native window (null-safe).
 pub function native_window_close_handle(win) -> int
     alya_gui_window_destroy(win)
-    return 1
+    return true
 end
 
 ## Shows a native window.
 pub function native_window_show(win) -> int
     if win is null
-        return 0
+        return false
     end
     alya_gui_window_show(win)
-    return 1
+    return true
 end
 
 ## Returns 1 while the native window is open.
 pub function native_window_is_open(win) -> int
     if win is null
-        return 0
+        return false
     end
     return alya_gui_window_is_open(win)
 end
@@ -65,19 +65,19 @@ end
 ## Requests a graceful close (like the title-bar button).
 pub function native_window_request_close(win) -> int
     if win is null
-        return 0
+        return false
     end
     alya_gui_window_close(win)
-    return 1
+    return true
 end
 
 ## Resizes the native window client area.
 pub function native_window_resize(win, width: int, height: int) -> int
     if win is null
-        return 0
+        return false
     end
     alya_gui_window_set_size(win, width, height)
-    return 1
+    return true
 end
 
 ## Pumps once; returns the event kind (`0` = none, `1` = close, ...).
@@ -116,14 +116,14 @@ end
 ## Destroys a GPU surface (null-safe).
 pub function native_gpu_destroy(surf) -> int
     alya_gpu_surface_destroy(surf)
-    return 1
+    return true
 end
 
 ## Stages one XRGB pixel at flat `index` (`y * width + x`); returns `1`
 ## when stored (`0` for null surfaces or out-of-range writes).
 pub function native_gpu_stage(surf, index: int, color: int) -> int
     if surf is null
-        return 0
+        return false
     end
     return alya_gpu_surface_stage(surf, index, color)
 end
@@ -131,7 +131,7 @@ end
 ## Uploads the staged buffer and presents it; returns `1` on success.
 pub function native_gpu_present(surf) -> int
     if surf is null
-        return 0
+        return false
     end
     return alya_gpu_surface_present(surf)
 end
@@ -139,7 +139,7 @@ end
 ## Rebuilds a GPU surface at a new size (content reset); returns `1`.
 pub function native_gpu_resize(surf, width: int, height: int) -> int
     if surf is null
-        return 0
+        return false
     end
     return alya_gpu_surface_resize(surf, width, height)
 end
@@ -148,7 +148,7 @@ end
 ## per-OS coverage). Returns `1` when drawn. Null-safe.
 pub function native_gpu_text(surf, text: string, x: int, y: int, size_px: int, color: int) -> int
     if surf is null or text is null or text == ""
-        return 0
+        return false
     end
     return alya_gpu_surface_text(surf, text, x, y, size_px, color)
 end
@@ -161,7 +161,7 @@ end
 ## registry + provider tree — documented follow-up). Null-safe.
 pub function native_a11y_notify(win, code: int) -> int
     if win is null
-        return 0
+        return false
     end
     return alya_gui_a11y_notify(win, code)
 end

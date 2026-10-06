@@ -30,19 +30,19 @@ function main()
         end
         return
     end
-    runner_assert_eq(r, pkg::native_is_open(win), 1, "window open")
+    runner_assert_eq(r, pkg::native_is_open(win), true, "window open")
 
     # 2. Show + pump (drains any initial paint/resize noise)
-    runner_assert_eq(r, pkg::native_show(win), 1, "show returns 1")
+    runner_assert_eq(r, pkg::native_show(win), true, "show returns 1")
     let i = 0
     while i < 20
         pkg::native_poll(win)
         i += 1
     end
-    runner_assert_eq(r, pkg::native_is_open(win), 1, "still open")
+    runner_assert_eq(r, pkg::native_is_open(win), true, "still open")
 
     # 3. Resize flows through a RESIZE event with the new size
-    runner_assert_eq(r, pkg::native_resize(win, 400, 300), 1, "resize requested")
+    runner_assert_eq(r, pkg::native_resize(win, 400, 300), true, "resize requested")
     let rkind = 0
     let rticks = 0
     while rticks < 100
@@ -57,46 +57,46 @@ function main()
     runner_assert_eq(r, pkg::native_event_height(), 300, "resized height")
 
     # 3b. Drain maps native events to GuiEvent records (size in w/h)
-    runner_assert_eq(r, pkg::native_resize(win, 420, 320), 1, "resize 2 requested")
+    runner_assert_eq(r, pkg::native_resize(win, 420, 320), true, "resize 2 requested")
     let dq = pkg::event_queue()
-    let dfound = 0
+    let dfound = false
     let dticks = 0
     while dticks < 200
         pkg::native_drain(win, dq)
         while pkg::event_queue_len(dq) > 0
             let dev: GuiEvent = pkg::event_queue_poll(dq)
             if dev.kind == 2 and dev.w == 420 and dev.h == 320
-                dfound = 1
+                dfound = true
             end
         end
-        if dfound == 1
+        if dfound == true
             break
         end
         dticks += 1
     end
-    runner_assert_eq(r, dfound, 1, "drain maps RESIZE with size")
+    runner_assert_eq(r, dfound, true, "drain maps RESIZE with size")
 
     # 3c. GPU surface: create/stage/blit/present/resize/destroy live
     let gs = pkg::gpu_create(win, 64, 48)
     if gs is null
         runner_assert(r, 1 == 1, "no GPU, skipped")
     else
-        runner_assert_eq(r, pkg::gpu_stage(gs, 0, 16711680), 1, "gpu stage stored")
-        runner_assert_eq(r, pkg::gpu_stage(gs, 99999, 255), 0, "gpu stage OOB ignored")
+        runner_assert_eq(r, pkg::gpu_stage(gs, 0, 16711680), true, "gpu stage stored")
+        runner_assert_eq(r, pkg::gpu_stage(gs, 99999, 255), false, "gpu stage OOB ignored")
         let bs = pkg::surface(64, 48, 255)
         runner_assert_eq(r, pkg::gpu_blit(bs, gs), 3072, "gpu blit staged all pixels")
-        runner_assert_eq(r, pkg::gpu_present(gs), 1, "gpu present shown")
-        runner_assert_eq(r, pkg::gpu_text(gs, "Alya", 8, 8, 20, 16777215), 1, "gpu text drawn")
-        runner_assert_eq(r, pkg::gpu_resize(gs, 32, 24), 1, "gpu resize ok")
-        runner_assert_eq(r, pkg::gpu_destroy(gs), 1, "gpu destroy ok")
+        runner_assert_eq(r, pkg::gpu_present(gs), true, "gpu present shown")
+        runner_assert_eq(r, pkg::gpu_text(gs, "Alya", 8, 8, 20, 16777215), true, "gpu text drawn")
+        runner_assert_eq(r, pkg::gpu_resize(gs, 32, 24), true, "gpu resize ok")
+        runner_assert_eq(r, pkg::gpu_destroy(gs), true, "gpu destroy ok")
     end
 
     # 3d. Screen-reader notification reaches the OS on a live window
-    runner_assert_eq(r, pkg::a11y_notify(win, 1), 1, "a11y focus notified")
-    runner_assert_eq(r, pkg::a11y_notify(win, 2), 1, "a11y value notified")
+    runner_assert_eq(r, pkg::a11y_notify(win, 1), true, "a11y focus notified")
+    runner_assert_eq(r, pkg::a11y_notify(win, 2), true, "a11y value notified")
 
     # 4. Graceful close -> CLOSE event -> not open
-    runner_assert_eq(r, pkg::native_request_close(win), 1, "close requested")
+    runner_assert_eq(r, pkg::native_request_close(win), true, "close requested")
     let kind = 0
     let ticks = 0
     while ticks < 100
@@ -107,13 +107,13 @@ function main()
         ticks += 1
     end
     runner_assert_eq(r, kind, 1, "CLOSE event pumped")
-    runner_assert_eq(r, pkg::native_is_open(win), 0, "closed after event")
+    runner_assert_eq(r, pkg::native_is_open(win), false, "closed after event")
 
     # 4. Null safety
     runner_assert_eq(r, pkg::native_poll(null), 0, "poll null is 0")    runner_assert_eq(r, pkg::native_drain(null, pkg::event_queue()), 0, "drain null win is 0")
     runner_assert_eq(r, pkg::native_drain(win, null), 0, "drain null queue is 0")
-    runner_assert_eq(r, pkg::native_is_open(null), 0, "is_open null is 0")
-    runner_assert_eq(r, pkg::native_destroy(null), 1, "destroy null safe")
+    runner_assert_eq(r, pkg::native_is_open(null), false, "is_open null is 0")
+    runner_assert_eq(r, pkg::native_destroy(null), true, "destroy null safe")
     pkg::native_destroy(win)
 
     let failed = runner_summary(r)

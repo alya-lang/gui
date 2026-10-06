@@ -28,7 +28,7 @@ end
 
 ## Creates a signal holding `initial` (version `0`, no watchers).
 pub function signal_new(initial) -> Signal
-    return Signal { value: initial, version: 0, watchers: [], bound: [], bound_active: 0 }
+    return Signal { value: initial, version: 0, watchers: [], bound: [], bound_active: false }
 end
 
 ## Returns the current payload.
@@ -52,15 +52,15 @@ end
 ## Returns `1` when watchers ran, `0` when the value is unchanged.
 pub function signal_set(s: Signal, v) -> int
     if s is null
-        return 0
+        return false
     end
     if v == s.value
-        return 0
+        return false
     end
     s.value = v
     s.version = s.version + 1
     notify_watchers(s)
-    return 1
+    return true
 end
 
 # Runs every watcher with the signal.
@@ -96,30 +96,30 @@ end
 ## Marks the node for repaint; returns `1`.
 pub function widget_mark_dirty(w: Widget) -> int
     if w is null
-        return 0
+        return false
     end
-    w.dirty = 1
-    return 1
+    w.dirty = true
+    return true
 end
 
 ## Returns the redraw flag (`0`/`1`).
 pub function widget_is_dirty(w: Widget) -> int
     if w is null
-        return 0
+        return false
     end
-    if w.dirty == 0
-        return 0
+    if w.dirty == false
+        return false
     end
-    return 1
+    return true
 end
 
 ## Clears the redraw flag; returns `1`.
 pub function widget_clear_dirty(w: Widget) -> int
     if w is null
-        return 0
+        return false
     end
-    w.dirty = 0
-    return 1
+    w.dirty = false
+    return true
 end
 
 ## Binds a signal to a widget's text: the widget shows the string form
@@ -134,8 +134,8 @@ pub function bind_signal_text(sig: Signal, w: Widget) -> int
     w.text = str(signal_get(sig))
     widget_mark_dirty(w)
     sig.bound.push(w)
-    if sig.bound_active == 0
-        sig.bound_active = 1
+    if sig.bound_active == false
+        sig.bound_active = true
         signal_watch(sig, bound_text_updater)
     end
     return signal_watcher_count(sig)
