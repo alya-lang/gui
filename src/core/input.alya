@@ -581,7 +581,7 @@ function textinput_append(w: Widget, text: string) -> int
     if text is null or text == ""
         return false
     end
-    w.text = w.text + text
+    w.text += text
     widget_mark_dirty(w)
     if w.on_change is not null
         let cb = w.on_change

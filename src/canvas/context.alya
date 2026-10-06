@@ -70,8 +70,8 @@ pub function ctx_line(ctx: DrawContext, x0: int, y0: int, x1: int, y1: int) -> i
     let n = image_line(ctx.img, x0, y0, x1, y1, color_to_int(ctx.stroke))
     let w = 1
     while w < ctx.stroke_w
-        n = n + image_line(ctx.img, x0, y0 + w, x1, y1 + w, color_to_int(ctx.stroke))
-        n = n + image_line(ctx.img, x0, y0 - w, x1, y1 - w, color_to_int(ctx.stroke))
+        n += image_line(ctx.img, x0, y0 + w, x1, y1 + w, color_to_int(ctx.stroke))
+        n += image_line(ctx.img, x0, y0 - w, x1, y1 - w, color_to_int(ctx.stroke))
         w += 1
     end
     return n
@@ -84,9 +84,9 @@ pub function ctx_rect(ctx: DrawContext, x: int, y: int, w: int, h: int) -> int
     end
     let c = color_to_int(ctx.stroke)
     let n = image_line(ctx.img, x, y, x + w - 1, y, c)
-    n = n + image_line(ctx.img, x, y + h - 1, x + w - 1, y + h - 1, c)
-    n = n + image_line(ctx.img, x, y, x, y + h - 1, c)
-    n = n + image_line(ctx.img, x + w - 1, y, x + w - 1, y + h - 1, c)
+    n += image_line(ctx.img, x, y + h - 1, x + w - 1, y + h - 1, c)
+    n += image_line(ctx.img, x, y, x, y + h - 1, c)
+    n += image_line(ctx.img, x + w - 1, y, x + w - 1, y + h - 1, c)
     return n
 end
 

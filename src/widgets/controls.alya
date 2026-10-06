@@ -201,9 +201,51 @@ end
 ## - Dropdown (enabled): toggles the option list; row clicks select.
 ##   A click anywhere else first closes open lists, then dispatches.
 ## - Anything else, disabled nodes, or a miss: returns `0`.
+# Finds the first visible, enabled slider whose vertical track band
+# contains `y` (depth-first). Drags ending past the track ends miss
+# hit-testing, but still address the slider: x maps clamped.
+function slider_drag_target(root: Widget, y: int)
+    if root is null or root.visible == false
+        return null
+    end
+    if root.kind == "slider" and root.enabled != false
+        if y >= root.rect.y and y < root.rect.y + root.rect.h
+            return root
+        end
+    end
+    let i = 0
+    while i < len(root.children)
+        let hit = slider_drag_target(root.children[i], y)
+        if hit is not null
+            return hit
+        end
+        i += 1
+    end
+    return null
+end
+
+# Applies an out-of-track slider drag: clamps x onto the range, fires
+# `on_change`, and consumes the click. Returns `1` when a slider
+# took the drag, `0` otherwise.
+function slider_drag_clamp(root: Widget, x: int, y: int) -> int
+    let drag = slider_drag_target(root, y)
+    if drag is null
+        return false
+    end
+    drag.value = slider_value_from_x(drag, x)
+    if drag.on_change is not null
+        let scb = drag.on_change
+        scb(drag)
+    end
+    return true
+end
+
 pub function dispatch_click(root: Widget, x: int, y: int) -> int
     let target = widget_hit(root, x, y)
-    if target is null or target.enabled == false
+    if target is null
+        return slider_drag_clamp(root, x, y)
+    end
+    if target.enabled == false
         return false
     end
     if target.kind == "dropdown"
@@ -276,7 +318,7 @@ pub function close_other_dropdowns(root: Widget, except_id: string) -> int
     end
     let i = 0
     while i < len(root.children)
-        n = n + close_other_dropdowns(root.children[i], except_id)
+        n += close_other_dropdowns(root.children[i], except_id)
         i += 1
     end
     return n

@@ -72,7 +72,7 @@ pub function image_rect(img: Image, x: int, y: int, w: int, h: int, color: int) 
     while yy < y + h
         let xx = x
         while xx < x + w
-            n = n + image_set_px(img, xx, yy, color)
+            n += image_set_px(img, xx, yy, color)
             xx += 1
         end
         yy += 1
@@ -106,18 +106,18 @@ pub function image_line(img: Image, x0: int, y0: int, x1: int, y1: int, color: i
     let x = x0
     let y = y0
     while true
-        n = n + image_set_px(img, x, y, color)
+        n += image_set_px(img, x, y, color)
         if x == x1 and y == y1
             break
         end
         let e2 = err * 2
         if e2 > 0 - dy
-            err = err - dy
-            x = x + sx
+            err -= dy
+            x += sx
         end
         if e2 < dx
-            err = err + dx
-            y = y + sy
+            err += dx
+            y += sy
         end
     end
     return n
@@ -133,21 +133,21 @@ pub function image_circle(img: Image, cx: int, cy: int, radius: int, color: int)
     let y = 0
     let err = 0
     while x >= y
-        n = n + image_set_px(img, cx + x, cy + y, color)
-        n = n + image_set_px(img, cx + y, cy + x, color)
-        n = n + image_set_px(img, cx - y, cy + x, color)
-        n = n + image_set_px(img, cx - x, cy + y, color)
-        n = n + image_set_px(img, cx - x, cy - y, color)
-        n = n + image_set_px(img, cx - y, cy - x, color)
-        n = n + image_set_px(img, cx + y, cy - x, color)
-        n = n + image_set_px(img, cx + x, cy - y, color)
+        n += image_set_px(img, cx + x, cy + y, color)
+        n += image_set_px(img, cx + y, cy + x, color)
+        n += image_set_px(img, cx - y, cy + x, color)
+        n += image_set_px(img, cx - x, cy + y, color)
+        n += image_set_px(img, cx - x, cy - y, color)
+        n += image_set_px(img, cx - y, cy - x, color)
+        n += image_set_px(img, cx + y, cy - x, color)
+        n += image_set_px(img, cx + x, cy - y, color)
         y += 1
         if err <= 0
-            err = err + 2 * y + 1
+            err += 2 * y + 1
         end
         if err > 0
             x -= 1
-            err = err - 2 * x - 1
+            err -= 2 * x - 1
         end
     end
     return n
@@ -164,7 +164,7 @@ pub function image_to_ppm(img: Image) -> string
         let x = 0
         while x < img.w
             let c = img.pixels[y * img.w + x]
-            out = out + str((c / 65536) % 256) + " " + str((c / 256) % 256) + " " + str(c % 256) + "\n"
+            out += str((c / 65536) % 256) + " " + str((c / 256) % 256) + " " + str(c % 256) + "\n"
             x += 1
         end
         y += 1
@@ -208,7 +208,7 @@ pub function image_circle_filled(img: Image, cx: int, cy: int, radius: int, colo
     let dy = 0 - radius
     while dy <= radius
         let dx = image_isqrt(radius * radius - dy * dy)
-        n = n + image_rect(img, cx - dx, cy + dy, dx * 2 + 1, 1, color)
+        n += image_rect(img, cx - dx, cy + dy, dx * 2 + 1, 1, color)
         dy += 1
     end
     return n
@@ -233,16 +233,16 @@ pub function image_rect_rounded(img: Image, x: int, y: int, w: int, h: int, r: i
         return image_rect(img, x, y, w, h, color)
     end
     let n = 0
-    n = n + image_rect(img, x + rad, y, w - rad * 2, h, color)
-    n = n + image_rect(img, x, y + rad, rad, h - rad * 2, color)
-    n = n + image_rect(img, x + w - rad, y + rad, rad, h - rad * 2, color)
+    n += image_rect(img, x + rad, y, w - rad * 2, h, color)
+    n += image_rect(img, x, y + rad, rad, h - rad * 2, color)
+    n += image_rect(img, x + w - rad, y + rad, rad, h - rad * 2, color)
     let cy = 0 - rad
     while cy < 0
         let dx = image_isqrt(rad * rad - cy * cy)
-        n = n + image_rect(img, x + rad - dx, y + rad + cy, dx, 1, color)
-        n = n + image_rect(img, x + w - rad, y + rad + cy, dx, 1, color)
-        n = n + image_rect(img, x + rad - dx, y + h - rad - cy - 1, dx, 1, color)
-        n = n + image_rect(img, x + w - rad, y + h - rad - cy - 1, dx, 1, color)
+        n += image_rect(img, x + rad - dx, y + rad + cy, dx, 1, color)
+        n += image_rect(img, x + w - rad, y + rad + cy, dx, 1, color)
+        n += image_rect(img, x + rad - dx, y + h - rad - cy - 1, dx, 1, color)
+        n += image_rect(img, x + w - rad, y + h - rad - cy - 1, dx, 1, color)
         cy += 1
     end
     return n

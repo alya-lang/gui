@@ -61,7 +61,7 @@ pub function event_queue_poll(q: GuiEventQueue)
         return null
     end
     let ev = q.events[q.head]
-    q.head = q.head + 1
+    q.head += 1
     if q.head > 64 and q.head * 2 >= len(q.events)
         let rest = []
         let i = q.head

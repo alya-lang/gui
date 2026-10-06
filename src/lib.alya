@@ -416,7 +416,7 @@ pub function gpu_blit(s: DrawSurface, surf) -> int
     let n = 0
     let i = 0
     while i < len(px)
-        n = n + native_gpu_stage(surf, i, px[i])
+        n += native_gpu_stage(surf, i, px[i])
         i += 1
     end
     if native_gpu_present(surf) == false

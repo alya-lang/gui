@@ -33,7 +33,7 @@ pub function layout_vbox(container: Rect, padding: int, spacing: int, sizes: Siz
     while i < len(sizes)
         let s: Size = sizes[i]
         out.push(Rect { x: inner.x, y: y, w: inner.w, h: s.h })
-        y = y + s.h + spacing
+        y += s.h + spacing
         i += 1
     end
     return out
@@ -51,7 +51,7 @@ pub function layout_hbox(container: Rect, padding: int, spacing: int, sizes: Siz
     while i < len(sizes)
         let s: Size = sizes[i]
         out.push(Rect { x: x, y: inner.y, w: s.w, h: inner.h })
-        x = x + s.w + spacing
+        x += s.w + spacing
         i += 1
     end
     return out

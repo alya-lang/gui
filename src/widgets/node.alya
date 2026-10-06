@@ -308,7 +308,7 @@ pub function widget_clear_subtree(root: Widget) -> int
     end
     let i = 0
     while i < len(root.children)
-        n = n + widget_clear_subtree(root.children[i])
+        n += widget_clear_subtree(root.children[i])
         i += 1
     end
     return n

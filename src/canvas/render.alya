@@ -55,17 +55,17 @@ end
 # Strokes a 1px rectangle outline; returns painted count.
 function paint_border(img: Image, r: Rect, color: int) -> int
     let n = 0
-    n = n + image_line(img, r.x, r.y, r.x + r.w - 1, r.y, color)
-    n = n + image_line(img, r.x, r.y + r.h - 1, r.x + r.w - 1, r.y + r.h - 1, color)
-    n = n + image_line(img, r.x, r.y, r.x, r.y + r.h - 1, color)
-    n = n + image_line(img, r.x + r.w - 1, r.y, r.x + r.w - 1, r.y + r.h - 1, color)
+    n += image_line(img, r.x, r.y, r.x + r.w - 1, r.y, color)
+    n += image_line(img, r.x, r.y + r.h - 1, r.x + r.w - 1, r.y + r.h - 1, color)
+    n += image_line(img, r.x, r.y, r.x, r.y + r.h - 1, color)
+    n += image_line(img, r.x + r.w - 1, r.y, r.x + r.w - 1, r.y + r.h - 1, color)
     return n
 end
 
 # Fills a rounded box with a 1px border (two fills); returns painted count.
 function paint_framed(img: Image, x: int, y: int, w: int, h: int, r: int, fill: int, border: int) -> int
     let n = image_rect_rounded(img, x, y, w, h, r, border)
-    n = n + image_rect_rounded(img, x + 1, y + 1, w - 2, h - 2, r, fill)
+    n += image_rect_rounded(img, x + 1, y + 1, w - 2, h - 2, r, fill)
     return n
 end
 

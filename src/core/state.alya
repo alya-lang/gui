@@ -58,7 +58,7 @@ pub function signal_set(s: Signal, v) -> int
         return false
     end
     s.value = v
-    s.version = s.version + 1
+    s.version += 1
     notify_watchers(s)
     return true
 end

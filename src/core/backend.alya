@@ -47,7 +47,7 @@ end
 ## Returns 1 when no usable display is reachable on Linux.
 ##
 ## Windows and macOS always report `0` (their window managers are implicit).
-pub function is_headless() -> int
+pub function is_headless() -> bool
     if os::is_linux() == true
         if backend_display() == ""
             return true
