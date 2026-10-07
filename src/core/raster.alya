@@ -147,7 +147,7 @@ pub function image_circle(img: Image, cx: int, cy: int, radius: int, color: int)
         end
         if err > 0
             x -= 1
-            err -= 2 * x - 1
+            err = err - 2 * x - 1
         end
     end
     return n
