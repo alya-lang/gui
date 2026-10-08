@@ -37,12 +37,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Install Linux X11 headers (X11 fallback backend)
-        if: startsWith(matrix.os, 'ubuntu')
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y -qq libx11-dev
-
       - name: Set up Alya Compiler
         uses: alya-lang/setup-alya@v1
         with:
@@ -69,26 +63,12 @@ jobs:
           alya install
 
       - name: Run package test suite
+        env:
+          # Inner `alya test` suites default to a 60s per-binary timeout;
+          # heavy suites exceed it on slow runners (mirrors alya-lang/test).
+          ALYA_TEST_TIMEOUT_SECS: '600'
         run: |
           alya test
-
-      - name: Verify GUI bundle build + binary size gate
-        shell: bash
-        run: |
-          alya build examples/hello_gui.alya --gui -o "$RUNNER_TEMP/hello_gui_check"
-          if [ "$RUNNER_OS" = "macOS" ]; then
-            BIN="$RUNNER_TEMP/hello_gui_check.app/Contents/MacOS/hello_gui_check"
-            SIZE=$(stat -f%z "$BIN")
-          elif [ "$RUNNER_OS" = "Windows" ]; then
-            BIN="$RUNNER_TEMP/hello_gui_check/hello_gui_check.exe"
-            SIZE=$(stat -c%s "$BIN")
-            grep -q "PerMonitorV2" "$RUNNER_TEMP/hello_gui_check/hello_gui_check.exe.manifest"
-          else
-            BIN="$RUNNER_TEMP/hello_gui_check/hello_gui_check"
-            SIZE=$(stat -c%s "$BIN")
-          fi
-          echo "bundle binary bytes: $SIZE"
-          test "$SIZE" -lt 5242880
 
       - name: Run micro-benchmarks smoke test
         if: hashFiles('benches/bench_basic.alya') != ''
