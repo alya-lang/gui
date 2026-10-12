@@ -27,7 +27,7 @@ end
 function forward_events(q, ch: Channel[int], n: int) -> int
     let i = 0
     while i < n
-        let ev = pkg::event_queue_poll(q)
+        let ev: GuiEvent = pkg::event_queue_poll(q)
         if ev is null
             break
         end

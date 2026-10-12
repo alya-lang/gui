@@ -81,7 +81,7 @@ pub function input_focus(st: InputState, root: Widget, id: string) -> int
     if st is null or root is null or id is null or id == ""
         return false
     end
-    let target = widget_find(root, id)
+    let target: Widget = widget_find(root, id)
     if target is null or target.enabled == false
         return false
     end
@@ -182,7 +182,7 @@ pub function dispatch_mouse_move(st: InputState, root: Widget, x: int, y: int) -
     st.mouse_y = y
     let id = ""
     if root is not null
-        let hit = widget_hit(root, x, y)
+        let hit: Widget = widget_hit(root, x, y)
         if hit is not null
             id = hit.id
         end
@@ -216,7 +216,7 @@ pub function dispatch_mouse_down(st: InputState, root: Widget, x: int, y: int) -
         st.focus = drop
         return true
     end
-    let hit = widget_hit(root, x, y)
+    let hit: Widget = widget_hit(root, x, y)
     if hit is null or hit.enabled == false
         close_other_dropdowns(root, "")
         st.focus = ""
@@ -245,12 +245,12 @@ pub function dispatch_mouse_up(st: InputState, root: Widget, x: int, y: int) -> 
         st.pressed = ""
         return false
     end
-    let target = widget_find(root, st.pressed)
+    let target: Widget = widget_find(root, st.pressed)
     st.pressed = ""
     if target is null or target.enabled == false
         return false
     end
-    let hit = widget_hit(root, x, y)
+    let hit: Widget = widget_hit(root, x, y)
     if hit is null or hit.id != target.id
         return false
     end
@@ -273,7 +273,7 @@ pub function dispatch_key(st: InputState, root: Widget, key: int) -> int
     end
     if key == 27
         if st.focus != ""
-            let fe = widget_find(root, st.focus)
+            let fe: Widget = widget_find(root, st.focus)
             if fe is not null and fe.kind == "dropdown" and fe.open == true
                 fe.open = false
                 fe.dirty = true
@@ -292,7 +292,7 @@ pub function dispatch_key(st: InputState, root: Widget, key: int) -> int
     if st.focus == ""
         return false
     end
-    let target = widget_find(root, st.focus)
+    let target: Widget = widget_find(root, st.focus)
     if target is null or target.enabled == false
         return false
     end
@@ -348,7 +348,7 @@ pub function dispatch_text(st: InputState, root: Widget, text: string) -> int
     if st.focus == ""
         return false
     end
-    let target = widget_find(root, st.focus)
+    let target: Widget = widget_find(root, st.focus)
     if target is null or target.enabled == false
         return false
     end
@@ -432,7 +432,7 @@ end
 ## is empty) into the focused input. Fires `on_change`, marks dirty.
 ## Returns `1` when committed, else `0`.
 pub function dispatch_ime_end(st: InputState, root: Widget, text: string) -> int
-    let target = ime_target(st, root)
+    let target: Widget = ime_target(st, root)
     if target is null
         if st is not null
             st.composing = ""
@@ -452,7 +452,7 @@ function ime_target(st: InputState, root: Widget)
     if st is null or root is null or st.focus == ""
         return null
     end
-    let target = widget_find(root, st.focus)
+    let target: Widget = widget_find(root, st.focus)
     if target is null or target.enabled == false
         return null
     end

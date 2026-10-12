@@ -141,7 +141,7 @@ pub function radio_group_select(root: Widget, group: string, id: string) -> int
     if found == false
         return false
     end
-    let target: Widget = widget_find(root, id)
+    let target: Widget? = widget_find(root, id)
     if target is not null and target.on_change is not null
         let ccb = target.on_change
         ccb(target)
@@ -241,7 +241,7 @@ function slider_drag_clamp(root: Widget, x: int, y: int) -> int
 end
 
 pub function dispatch_click(root: Widget, x: int, y: int) -> int
-    let target = widget_hit(root, x, y)
+    let target: Widget = widget_hit(root, x, y)
     if target is null
         return slider_drag_clamp(root, x, y)
     end
@@ -426,7 +426,7 @@ pub function dispatch_bubble(root: Widget, x: int, y: int) -> int
     if root is null
         return false
     end
-    let node = widget_hit(root, x, y)
+    let node: Widget = widget_hit(root, x, y)
     while node is not null
         if node.enabled == true and node.on_click is not null
             let cb = node.on_click
